@@ -1,0 +1,35 @@
+# ==========================================
+# Caché y archivos compilados de Python
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ==========================================
+# Entornos Virtuales y Variables de Entorno
+# ==========================================
+venv/
+env/
+.env
+
+# ==========================================
+# Archivos Temporales y de Datos (Excel)
+# ==========================================
+# Ignora los archivos temporales que crea Excel cuando lo tienes abierto (los que empiezan con ~$)
+~$*.xlsx
+
+# (Opcional) Descomenta la siguiente línea si NO quieres subir tus archivos Excel al repositorio:
+# data/*.xlsx
+*.xlsx
+
+# ==========================================
+# Configuración de Editores de Código (IDE)
+# ==========================================
+.vscode/
+.idea/
+
+# ==========================================
+# Archivos del Sistema Operativo
+# ==========================================
+.DS_Store
+Thumbs.db
