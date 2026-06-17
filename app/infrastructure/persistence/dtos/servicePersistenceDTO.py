@@ -1,37 +1,44 @@
 from pydantic import BaseModel, Field
-from typing import List, Any
-from app.domain.service import ServiceEntity, IterationEntity, ConflictEntity
+from typing import List, Optional
 
 
-class ServicePersistenceDTO(BaseModel):
-    """DTO de entrada desde MongoDB - Mapea la estructura de base de datos a Dominio"""
-    id: str = Field(alias="_id")  # MongoDB requiere _id
+# ==========================================
+# MODELOS DE ESCRITURA (SYNC / COMPARATOR)
+# ==========================================
+class CellConflict(BaseModel):
+    """Representa un conflicto en una celda entre diccionario base y perimetro"""
+    column: str
+    dictionary_base_value: str
+    perimeter_new_proposal: str
+
+
+class ExcelRowData(BaseModel):
+    """Datos completos de una fila de Excel con información del servicio"""
+    app: str
+    type: str
+    verb: str
+    scope: str
+    functional_use: str
+    inputs: List[str]
+    outputs: List[str]
+    invokes: List[str]
+    reference_tables: List[str]
+    source_document: str
+    doc_version: str
+    reliability: str
+
+
+class PerimeterIteration(BaseModel):
+    """Una iteración del perimetro con sus datos y conflictos"""
+    iteration_id: int
+    data: ExcelRowData
+    conflicts: List[CellConflict]
+
+
+class ServiceDocument(BaseModel):
+    """DTO de persistencia - Mapea la estructura de MongoDB al dominio"""
+    id: str = Field(alias="_id")  # Clave para guardar en Mongo
     exists_in_dictionary: str
     consolidated_status: str
-    winning_data: Any  # Datos raw de MongoDB
-    perimeter_iterations: List[Any] = []
-
-    def to_domain(self) -> ServiceEntity:
-        """Mapeador: Convierte el modelo de base de datos a Entidad de Dominio"""
-        domain_iterations = []
-        for it in self.perimeter_iterations:
-            conflicts = [
-                ConflictEntity(
-                    column=c.get("column", ""),
-                    dictionary_base_value=c.get("dictionary_base_value", ""),
-                    perimeter_new_proposal=c.get("perimeter_new_proposal", "")
-                ) for c in it.get("conflicts", [])
-            ]
-            domain_iterations.append(IterationEntity(
-                iteration_id=it.get("iteration_id", 0),
-                doc_version=it.get("data", {}).get("doc_version", ""),
-                functional_use=it.get("data", {}).get("functional_use", ""),
-                conflicts=conflicts
-            ))
-
-        return ServiceEntity(
-            name=self.id,
-            exists_in_dictionary=self.exists_in_dictionary,
-            consolidated_status=self.consolidated_status,
-            iterations=domain_iterations
-        )
+    winning_data: Optional[ExcelRowData] = None
+    perimeter_iterations: List[PerimeterIteration] = []

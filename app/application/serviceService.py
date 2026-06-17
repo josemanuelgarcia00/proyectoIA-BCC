@@ -17,3 +17,16 @@ class ServiceService:
         Orquesta la obtención de un servicio específico.
         """
         return self.repo.get_by_id(item_id)
+    
+    def get_services_with_conflicts(self):
+        """
+        Obtiene servicios que tienen conflictos sin resolver.
+        """
+        return self.repo.get_services_with_conflicts()
+    
+    def get_resolved_services(self):
+        """
+        Obtiene servicios que fueron resueltos o no tienen conflictos.
+        Estos irían al diccionario final.
+        """
+        return self.repo.get_resolved_services()

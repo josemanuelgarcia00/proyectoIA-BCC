@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor de Conflictos - ProyectoIA</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-blue: #0066cc;
+            --light-blue: #e3f2fd;
+            --dark-blue: #003d99;
+            --accent-blue: #0099ff;
+            --border-color: #b3d9ff;
+            --success-green: #4caf50;
+            --warning-orange: #ff9800;
+            --danger-red: #f44336;
+            --text-dark: #1a1a1a;
+            --text-light: #666666;
+            --bg-light: #f5f5f5;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, var(--light-blue) 0%, #f0f8ff 100%);
+            color: var(--text-dark);
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--accent-blue) 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0, 102, 204, 0.2);
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        header p {
+            opacity: 0.95;
+            font-size: 1.1em;
+        }
+
+        .search-section {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            border-left: 5px solid var(--primary-blue);
+        }
+
+        .search-section h2 {
+            color: var(--primary-blue);
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+
+        .search-form {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .form-group {
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-dark);
+            font-size: 0.95em;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+            background: #fafbff;
+        }
+
+        button {
+            padding: 12px 32px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: var(--primary-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--dark-blue);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 102, 204, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--bg-light);
+            color: var(--primary-blue);
+            border: 2px solid var(--primary-blue);
+        }
+
+        .btn-secondary:hover {
+            background: var(--light-blue);
+        }
+
+        .btn-success {
+            background: var(--success-green);
+            color: white;
+            margin-right: 10px;
+        }
+
+        .btn-success:hover {
+            background: #45a049;
+        }
+
+        .btn-danger {
+            background: var(--danger-red);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #da190b;
+        }
+
+        .content-section {
+            background: white;
+            border-radius: 12px;
+            padding: 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            background: linear-gradient(135deg, rgba(0, 102, 204, 0.1) 0%, rgba(0, 153, 255, 0.05) 100%);
+            padding: 20px 25px;
+            border-bottom: 2px solid var(--border-color);
+            border-left: 5px solid var(--primary-blue);
+        }
+
+        .section-header h3 {
+            color: var(--primary-blue);
+            font-size: 1.3em;
+            margin: 0;
+        }
+
+        .section-content {
+            padding: 25px;
+        }
+
+        .service-item {
+            background: var(--light-blue);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid var(--primary-blue);
+            transition: all 0.3s ease;
+        }
+
+        .service-item:hover {
+            box-shadow: 0 4px 12px rgba(0, 102, 204, 0.15);
+            transform: translateX(4px);
+        }
+
+        .service-name {
+            font-weight: 600;
+            color: var(--primary-blue);
+            font-size: 1.15em;
+            margin-bottom: 8px;
+        }
+
+        .service-status {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 500;
+            margin-top: 10px;
+        }
+
+        .status-accepted {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-rejected {
+            background: #eddcd2;
+            color: #721c24;
+        }
+
+        .status-unified {
+            background: #e2d5f8;
+            color: #5a326e;
+        }
+
+        .status-review {
+            background: #ffe5b4;
+            color: #cc8800;
+        }
+
+        .status-conflict {
+            background: #f8d7da;
+            color: #721c24;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .detail-panel {
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border: 2px solid var(--border-color);
+        }
+
+        .detail-panel h4 {
+            color: var(--primary-blue);
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+
+        .iterations-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .iteration-card {
+            background: white;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .iteration-card:hover {
+            border-color: var(--primary-blue);
+            box-shadow: 0 4px 12px rgba(0, 102, 204, 0.15);
+        }
+
+        .iteration-number {
+            font-weight: 600;
+            color: var(--primary-blue);
+            margin-bottom: 10px;
+            font-size: 1.05em;
+        }
+
+        .field-conflict {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .field-name {
+            font-weight: 600;
+            color: var(--primary-blue);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .field-name .conflict-icon {
+            color: var(--danger-red);
+            font-weight: bold;
+        }
+
+        .option-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: var(--light-blue);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .option-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .option-row input[type="radio"] {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+            accent-color: var(--primary-blue);
+        }
+
+        .option-row:hover {
+            background: #d0e8ff;
+            transform: translateX(4px);
+        }
+
+        .option-text {
+            flex: 1;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95em;
+            word-break: break-word;
+            color: var(--text-dark);
+        }
+
+        .option-source {
+            font-size: 0.85em;
+            color: var(--text-light);
+            font-style: italic;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+            display: none;
+        }
+
+        .message.show {
+            display: block;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border-left: 5px solid var(--success-green);
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 5px solid var(--danger-red);
+        }
+
+        .message.info {
+            background: var(--light-blue);
+            color: var(--primary-blue);
+            border-left: 5px solid var(--primary-blue);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid var(--light-blue);
+            border-top: 4px solid var(--primary-blue);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-light);
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .actions button {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        footer {
+            text-align: center;
+            color: var(--text-light);
+            margin-top: 40px;
+            padding: 20px;
+            border-top: 2px solid var(--border-color);
+        }
+
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.8em;
+            }
+
+            .search-form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .form-group {
+                min-width: 100%;
+            }
+
+            button {
+                width: 100%;
+            }
+
+            .iterations-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .service-item {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔧 Gestor de Conflictos de Servicios</h1>
+            <p>Resuelve conflictos entre iteraciones de datos del perímetro</p>
+            <div style="margin-top: 15px; display: flex; gap: 15px; align-items: center;">
+                <button class="btn-secondary" onclick="loadConflicts()" style="margin-top: 0;">
+                    🔄 Recargar Conflictos
+                </button>
+                <button class="btn-secondary" onclick="showDictionary()" style="margin-top: 0;">
+                    📚 Ver Diccionario Resuelto
+                </button>
+            </div>
+        </header>
+
+        <div class="search-section">
+            <h2>⚙️ Panel de Control</h2>
+            <div class="search-form">
+                <div class="form-group">
+                    <label for="serviceId">Buscar Servicio Específico:</label>
+                    <input type="text" id="serviceId" placeholder="Ej: ACTIVOS, PASIVOS, etc.">
+                </div>
+                <button class="btn-primary" onclick="searchService()">🔍 Buscar</button>
+            </div>
+        </div>
+
+        <div id="message" class="message"></div>
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Cargando datos...</p>
+        </div>
+
+        <div id="content">
+            <div class="empty-state">
+                <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <circle cx="50" cy="50" r="45"/>
+                    <path d="M 50 30 V 50 L 65 65"/>
+                </svg>
+                <h3>Introduce un ID de servicio para comenzar</h3>
+                <p>Busca un servicio para ver sus iteraciones y resolver conflictos</p>
+            </div>
+        </div>
+
+        <footer>
+            <p>ProyectoIA © 2025 - Sistema de Resolución de Conflictos</p>
+        </footer>
+    </div>
+
+    <script>
+        const API_BASE = '/api/v1/services';
+
+        function showMessage(text, type = 'info') {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.className = `message show ${type}`;
+            setTimeout(() => msg.classList.remove('show'), 5000);
+        }
+
+        function showLoading(show = true) {
+            document.getElementById('loading').classList.toggle('active', show);
+        }
+
+        // Cargar conflictos al inicializar la página
+        async function initializeApp() {
+            showLoading(true);
+            try {
+                await loadConflicts();
+            } catch (error) {
+                showMessage(`Error al cargar: ${error.message}`, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function loadConflicts() {
+            showLoading(true);
+            try {
+                const response = await fetch(`${API_BASE}/conflicts`);
+                
+                if (!response.ok) {
+                    throw new Error('Error al obtener conflictos');
+                }
+
+                const services = await response.json();
+                renderConflictsList(services);
+                
+                if (services.length === 0) {
+                    showMessage('✅ No hay conflictos pendientes', 'success');
+                } else {
+                    showMessage(`⚠️ ${services.length} servicio(s) con conflictos`, 'info');
+                }
+            } catch (error) {
+                showMessage(`Error: ${error.message}`, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function showDictionary() {
+            showLoading(true);
+            try {
+                const response = await fetch(`${API_BASE}/resolved`);
+                
+                if (!response.ok) {
+                    throw new Error('Error al obtener diccionario');
+                }
+
+                const services = await response.json();
+                renderDictionary(services);
+            } catch (error) {
+                showMessage(`Error: ${error.message}`, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function renderConflictsList(services) {
+            const content = document.getElementById('content');
+            
+            if (services.length === 0) {
+                content.innerHTML = `
+                    <div class="empty-state">
+                        <h3>✨ Todos los conflictos están resueltos</h3>
+                        <p>No hay servicios pendientes por revisar</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<div class="content-section"><div class="section-header"><h3>⚠️ Conflictos Detectados</h3></div><div class="section-content">';
+
+            for (const service of services) {
+                html += `
+                    <div class="service-item" style="cursor: pointer; background: #fff3cd;" onclick="searchService('${service.service_name}')">
+                        <div class="service-name">${service.service_name}</div>
+                        <div style="margin: 10px 0; color: var(--text-light);">
+                            <strong>Iteraciones:</strong> ${service.perimeter_iterations.length}<br>
+                            <strong>Estado:</strong> ${service.status}
+                        </div>
+                        <span class="service-status status-conflict">
+                            ⚠️ ${service.perimeter_iterations.filter(it => it.conflicts.length > 0).length} iteración(es) con conflictos
+                        </span>
+                        <div style="margin-top: 10px; font-size: 0.9em; color: var(--primary-blue);">
+                            Haz clic para resolver →
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += '</div></div>';
+            content.innerHTML = html;
+        }
+
+        function renderDictionary(services) {
+            const content = document.getElementById('content');
+            
+            if (services.length === 0) {
+                content.innerHTML = `
+                    <div class="empty-state">
+                        <h3>📚 Diccionario Vacío</h3>
+                        <p>Aún no hay servicios resueltos</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<div class="content-section"><div class="section-header"><h3>📚 Diccionario de Servicios Resueltos</h3></div><div class="section-content">';
+
+            for (const service of services) {
+                html += `
+                    <div class="service-item" style="background: #d4edda;">
+                        <div class="service-name">${service.service_name}</div>
+                        <div style="margin: 10px 0; color: var(--text-light); font-size: 0.95em;">
+                            <strong>Iteraciones:</strong> ${service.perimeter_iterations.length}<br>
+                            <strong>Estado:</strong> ${service.status}<br>
+                            <strong>En Diccionario:</strong> ${service.is_in_dictionary ? 'Sí ✅' : 'No ❌'}
+                        </div>
+                        <span class="service-status status-accepted">
+                            ✅ ${service.status}
+                        </span>
+                    </div>
+                `;
+            }
+
+            html += '</div></div>';
+            content.innerHTML = html;
+        }
+
+        async function searchService(serviceId = null) {
+            if (!serviceId) {
+                serviceId = document.getElementById('serviceId').value.trim().toUpperCase();
+            } else {
+                serviceId = serviceId.toUpperCase();
+            }
+            
+            if (!serviceId) {
+                showMessage('Por favor ingresa un ID de servicio', 'error');
+                return;
+            }
+
+            showLoading(true);
+            try {
+                const response = await fetch(`${API_BASE}/${serviceId}`);
+                
+                if (!response.ok) {
+                    throw new Error('Servicio no encontrado');
+                }
+
+                const service = await response.json();
+                renderServiceDetail(service);
+                showMessage(`✅ Servicio "${serviceId}" cargado correctamente`, 'success');
+            } catch (error) {
+                showMessage(`❌ Error: ${error.message}`, 'error');
+                document.getElementById('content').innerHTML = `
+                    <div class="empty-state">
+                        <p>No se encontraron resultados para: <strong>${serviceId}</strong></p>
+                    </div>
+                `;
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function renderServiceDetail(service) {
+            const content = document.getElementById('content');
+            const hasConflicts = service.perimeter_iterations.length > 1;
+            
+            let html = `
+                <div class="content-section">
+                    <div class="section-header">
+                        <h3>📋 Detalles del Servicio</h3>
+                    </div>
+                    <div class="section-content">
+                        <div class="service-item">
+                            <div class="service-name">${service.service_name}</div>
+                            <div style="margin: 10px 0; color: var(--text-light);">
+                                <strong>Estado:</strong> ${service.status}<br>
+                                <strong>En Diccionario:</strong> ${service.is_in_dictionary ? 'Sí' : 'No'}<br>
+                                <strong>Iteraciones:</strong> ${service.perimeter_iterations.length}
+                            </div>
+                            <span class="service-status ${getStatusClass(service.status)}">
+                                ${getStatusIcon(service.status)} ${service.status}
+                            </span>
+                        </div>
+            `;
+
+            if (hasConflicts) {
+                html += renderConflictResolver(service);
+            } else {
+                html += renderSingleIteration(service.perimeter_iterations[0]);
+            }
+
+            html += '</div></div>';
+            content.innerHTML = html;
+        }
+
+        function renderConflictResolver(service) {
+            let html = `
+                <div class="detail-panel">
+                    <h4>⚖️ Resolver Conflictos</h4>
+                    <p style="color: var(--text-light); margin-bottom: 15px;">
+                        Hay <strong>${service.perimeter_iterations.length} iteraciones</strong>. 
+                        Selecciona el valor que deseas para cada campo en conflicto.
+                    </p>
+                    <form id="conflictForm">
+            `;
+
+            const iterationsMap = new Map(
+                service.perimeter_iterations.map(it => [it.iteration_id, it])
+            );
+
+            // Detectar campos en conflicto
+            const fieldsInConflict = detectConflicts(service.perimeter_iterations);
+
+            if (Object.keys(fieldsInConflict).length === 0) {
+                html += `
+                    <div style="background: #d4edda; padding: 15px; border-radius: 8px; color: #155724;">
+                        ✅ No hay conflictos. Todas las iteraciones tienen datos idénticos.
+                    </div>
+                `;
+            } else {
+                for (const [fieldName, values] of Object.entries(fieldsInConflict)) {
+                    html += `
+                        <div class="field-conflict">
+                            <div class="field-name">
+                                <span class="conflict-icon">⚠️</span> ${fieldName}
+                            </div>
+                    `;
+
+                    for (const iteration of service.perimeter_iterations) {
+                        const fieldValue = iteration.data[fieldName];
+                        const displayValue = Array.isArray(fieldValue) 
+                            ? fieldValue.join(', ') 
+                            : fieldValue;
+
+                        html += `
+                            <div class="option-row">
+                                <input type="radio" 
+                                       name="${fieldName}" 
+                                       value="${JSON.stringify({iteration: iteration.iteration_id, value: displayValue})}"
+                                       onchange="handleFieldSelection('${fieldName}')">
+                                <div>
+                                    <div class="option-text">${displayValue}</div>
+                                    <div class="option-source">Iteración ${iteration.iteration_id} (v${iteration.data.doc_version})</div>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    html += '</div>';
+                }
+
+                html += `
+                    <div class="actions">
+                        <button type="button" class="btn-success" onclick="submitResolution()">
+                            ✅ Aplicar Resolución
+                        </button>
+                        <button type="button" class="btn-secondary" onclick="resetForm()">
+                            ↺ Limpiar Selecciones
+                        </button>
+                    </div>
+                `;
+            }
+
+            html += `
+                    </form>
+                </div>
+                <div class="detail-panel">
+                    <h4>📊 Iteraciones Disponibles</h4>
+                    <div class="iterations-grid">
+            `;
+
+            for (const iteration of service.perimeter_iterations) {
+                html += `
+                    <div class="iteration-card">
+                        <div class="iteration-number">Iteración ${iteration.iteration_id}</div>
+                        <div style="font-size: 0.9em; color: var(--text-light);">
+                            <strong>Versión:</strong> ${iteration.data.doc_version}<br>
+                            <strong>App:</strong> ${iteration.data.app}<br>
+                            <strong>Tipo:</strong> ${iteration.data.type}<br>
+                            <strong>Conflictos:</strong> ${iteration.conflicts.length}
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += '</div></div>';
+            return html;
+        }
+
+        function renderSingleIteration(iteration) {
+            let html = `
+                <div class="detail-panel">
+                    <h4>📌 Información de la Única Iteración</h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+            `;
+
+            const dataFields = [
+                'app', 'type', 'verb', 'scope', 'functional_use',
+                'inputs', 'outputs', 'invokes', 'reference_tables',
+                'source_document', 'doc_version', 'reliability'
+            ];
+
+            for (const field of dataFields) {
+                const value = iteration.data[field];
+                const displayValue = Array.isArray(value) ? value.join(', ') : value;
+                html += `
+                    <div style="background: var(--light-blue); padding: 12px; border-radius: 6px;">
+                        <strong style="color: var(--primary-blue);">${field}:</strong><br>
+                        <span style="font-size: 0.9em;">${displayValue}</span>
+                    </div>
+                `;
+            }
+
+            html += `
+                    </div>
+                    <div class="actions" style="margin-top: 20px;">
+                        <button class="btn-success" onclick="acceptService()">
+                            ✅ Aceptar esta iteración
+                        </button>
+                        <button class="btn-danger" onclick="rejectService()">
+                            ❌ Rechazar esta iteración
+                        </button>
+                    </div>
+                </div>
+            `;
+            return html;
+        }
+
+        function detectConflicts(iterations) {
+            if (iterations.length <= 1) return {};
+
+            const conflicts = {};
+            const firstData = iterations[0].data;
+
+            const fieldsToCheck = [
+                'app', 'type', 'verb', 'scope', 'functional_use',
+                'inputs', 'outputs', 'invokes', 'reference_tables',
+                'source_document', 'doc_version', 'reliability'
+            ];
+
+            for (const field of fieldsToCheck) {
+                const values = new Set();
+                for (const iteration of iterations) {
+                    const value = iteration.data[field];
+                    values.add(JSON.stringify(value));
+                }
+                if (values.size > 1) {
+                    conflicts[field] = Array.from(values).map(v => JSON.parse(v));
+                }
+            }
+
+            return conflicts;
+        }
+
+        function handleFieldSelection(fieldName) {
+            console.log(`Campo ${fieldName} seleccionado`);
+        }
+
+        function submitResolution() {
+            const form = document.getElementById('conflictForm');
+            const selections = {};
+
+            for (const radio of form.querySelectorAll('input[type="radio"]:checked')) {
+                selections[radio.name] = JSON.parse(radio.value);
+            }
+
+            if (Object.keys(selections).length === 0) {
+                showMessage('Por favor selecciona un valor para cada campo', 'error');
+                return;
+            }
+
+            console.log('Resolución aplicada:', selections);
+            showMessage('✅ Conflictos resueltos correctamente', 'success');
+            setTimeout(() => {
+                document.getElementById('serviceId').value = '';
+                document.getElementById('content').innerHTML = `
+                    <div class="empty-state">
+                        <p>Introduce otro ID de servicio para continuar</p>
+                    </div>
+                `;
+            }, 2000);
+        }
+
+        function resetForm() {
+            document.getElementById('conflictForm').reset();
+            showMessage('Selecciones limpiadas', 'info');
+        }
+
+        function acceptService() {
+            showMessage('✅ Iteración aceptada', 'success');
+            setTimeout(() => {
+                document.getElementById('serviceId').value = '';
+                document.getElementById('content').innerHTML = `
+                    <div class="empty-state">
+                        <p>Introduce otro ID de servicio para continuar</p>
+                    </div>
+                `;
+            }, 2000);
+        }
+
+        function rejectService() {
+            showMessage('❌ Iteración rechazada', 'error');
+            setTimeout(() => {
+                document.getElementById('serviceId').value = '';
+                document.getElementById('content').innerHTML = `
+                    <div class="empty-state">
+                        <p>Introduce otro ID de servicio para continuar</p>
+                    </div>
+                `;
+            }, 2000);
+        }
+
+        function getStatusClass(status) {
+            const statusMap = {
+                'Aceptado': 'status-accepted',
+                'Desechado': 'status-rejected',
+                'Unificado': 'status-unified',
+                'En revision': 'status-review'
+            };
+            return statusMap[status] || 'status-review';
+        }
+
+        function getStatusIcon(status) {
+            const iconMap = {
+                'Aceptado': '✅',
+                'Desechado': '❌',
+                'Unificado': '⚖️',
+                'En revision': '⏳'
+            };
+            return iconMap[status] || '❓';
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', initializeApp);
+        
+        document.getElementById('serviceId').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchService();
+            }
+        });
+    </script>
+</body>
+</html>
