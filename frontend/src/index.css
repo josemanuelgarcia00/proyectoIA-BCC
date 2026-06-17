@@ -210,6 +210,21 @@ button {
 button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); }
 button:active { transform: translateY(0); }
 
+.btn-header {
+  background: white;
+  color: var(--primary);
+  border: 2px solid white;
+  padding: 10px 14px;
+  font-size: 13px;
+  flex: none;
+  border-radius: 6px;
+}
+
+.btn-header:hover {
+  background: #f0f7ff;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
+}
+
 .btn-accept {
   background: linear-gradient(135deg, var(--success) 0%, #388e3c 100%);
   color: white;

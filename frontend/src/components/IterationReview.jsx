@@ -1,90 +1,81 @@
-import { useState, useEffect } from 'react'
-import FieldDiff from './FieldDiff'
+import React from 'react';
 
 export default function IterationReview({ service }) {
-  const [currentIdx, setCurrentIdx] = useState(0)
-  const [decisions, setDecisions] = useState({})
-  const [iterations, setIterations] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-
-  useEffect(() => {
-    if (!service) return
-    setLoading(true)
-    setError(null)
-    setCurrentIdx(0)
-    setDecisions({})
-    
-    fetch(`/api/v1/services/${service.service_name}/iterations`)
-      .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json()
-      })
-      .then(data => {
-        console.log('Iteraciones recibidas:', data)
-        setIterations(Array.isArray(data) ? data : [])
-        setLoading(false)
-      })
-      .catch(e => {
-        console.error('Error:', e)
-        setError(e.message)
-        setIterations([])
-        setLoading(false)
-      })
-  }, [service])
-
-  if (loading) return <div className="loading">⏳ Cargando iteraciones...</div>
-  if (error) return <div className="error">❌ Error: {error}</div>
-  if (iterations.length === 0) return <div className="empty">📭 Sin iteraciones</div>
-
-  const current = iterations[currentIdx]
-  const isLast = currentIdx === iterations.length - 1
-  const totalConflicts = iterations.reduce((sum, it) => sum + (it.conflicts?.length || 0), 0)
-
-  const handleDecision = (decision) => {
-    const newDecisions = { ...decisions, [currentIdx]: decision }
-    setDecisions(newDecisions)
-    if (isLast) {
-      console.log('✅ Resolución completada:', newDecisions)
-      alert('Conflictos resueltos. Decisiones guardadas.')
-    } else {
-      setCurrentIdx(currentIdx + 1)
-    }
+  // Protección por si el servicio aún no ha cargado correctamente
+  if (!service || !service.perimeter_iterations) {
+    return <div className="empty">Cargando detalles del servicio...</div>;
   }
 
   return (
     <div className="iteration-review">
-      <div className="iteration-header">
-        🔄 Iteración {current.iteration_id} de {iterations.length}
-        <br/>
-        <span style={{ fontSize: '12px', opacity: 0.8 }}>
-          {current.conflicts?.length || 0} conflicto(s) • {Object.keys(decisions).length}/{iterations.length} resueltas
-        </span>
-      </div>
-
-      {current.conflicts && current.conflicts.length > 0 ? (
-        <>
-          {current.conflicts.map((conflict, i) => (
-            <FieldDiff key={i} conflict={conflict} />
-          ))}
-          <div className="buttons">
-            <button className="btn-accept" onClick={() => handleDecision('accept')}>
-              ✅ Aceptar cambios
-            </button>
-            <button className="btn-reject" onClick={() => handleDecision('reject')}>
-              ❌ Rechazar
-            </button>
-          </div>
-        </>
+      <h2 style={{ marginBottom: '16px', color: 'var(--primary-dark)' }}>
+        Revisando: {service.service_name}
+      </h2>
+      
+      {service.perimeter_iterations.length === 0 ? (
+        <div className="empty">No hay iteraciones registradas para este servicio.</div>
       ) : (
-        <div className="empty">✨ Sin cambios en esta iteración</div>
-      )}
+        service.perimeter_iterations.map((iteration) => (
+          <div key={iteration.iteration_id} className="field-diff" style={{ marginBottom: '24px' }}>
+            
+            <div className="iteration-header" style={{ marginBottom: '16px' }}>
+              🔄 Iteración {iteration.iteration_id} de {service.perimeter_iterations.length}
+            </div>
+            
+            {/* Resumen de los datos de la iteración (Leemos de iteration.data) */}
+            <div style={{ marginBottom: '16px', padding: '12px', background: '#f8f9fa', borderRadius: '8px' }}>
+              <h4 style={{ fontSize: '12px', color: 'var(--text-light)', marginBottom: '8px', textTransform: 'uppercase' }}>
+                Datos capturados del Perímetro
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '13px' }}>
+                <div><strong>App:</strong> {iteration.data.app || 'N/A'}</div>
+                <div><strong>Verbo:</strong> {iteration.data.verb || 'N/A'}</div>
+                <div><strong>Tipo:</strong> {iteration.data.type || 'N/A'}</div>
+                <div><strong>Ámbito:</strong> {iteration.data.scope || 'N/A'}</div>
+              </div>
+            </div>
 
-      {isLast && Object.keys(decisions).length === iterations.length && (
-        <button className="btn-next" style={{ marginTop: '16px' }} onClick={() => window.location.reload()}>
-          🎉 Completar y recargar
-        </button>
+            {/* Mapeo de Conflictos */}
+            {(!iteration.conflicts || iteration.conflicts.length === 0) ? (
+              <div style={{ textAlign: 'center', color: '#888', fontStyle: 'italic', padding: '12px' }}>
+                ✨ Sin conflictos con el diccionario en esta iteración
+              </div>
+            ) : (
+              <div>
+                <h4 style={{ fontSize: '13px', color: 'var(--error)', marginBottom: '12px', textTransform: 'uppercase' }}>
+                  ⚠️ Conflictos Detectados ({iteration.conflicts.length})
+                </h4>
+                
+                {iteration.conflicts.map((conflict, idx) => (
+                  <div key={idx} style={{ marginBottom: '16px', borderLeft: '3px solid var(--warning)', paddingLeft: '12px' }}>
+                    <div className="field-name">Columna: {conflict.column}</div>
+                    <div className="field-values">
+                      <div className="value-box">
+                        <div className="label">Diccionario (Maestro)</div>
+                        <div style={{ color: 'var(--error)', textDecoration: 'line-through' }}>
+                          {conflict.original || 'N/D'}
+                        </div>
+                      </div>
+                      <div className="value-box">
+                        <div className="label">Nueva Propuesta</div>
+                        <div style={{ color: 'var(--success)', fontWeight: 'bold' }}>
+                          {conflict.proposed || 'N/D'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                <div className="buttons">
+                  <button className="btn-accept">Aceptar Propuesta</button>
+                  <button className="btn-reject">Mantener Diccionario</button>
+                </div>
+              </div>
+            )}
+            
+          </div>
+        ))
       )}
     </div>
-  )
+  );
 }

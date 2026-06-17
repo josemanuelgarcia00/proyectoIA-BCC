@@ -1,40 +1,83 @@
-import { useState, useEffect } from 'react'
-import ConflictResolver from './components/ConflictResolver'
-import IterationReview from './components/IterationReview'
+import { useState, useEffect } from 'react';
+import IterationReview from './components/IterationReview';
+import './index.css';
 
 export default function App() {
-  const [services, setServices] = useState([])
-  const [selectedService, setSelectedService] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [services, setServices] = useState([]);
+  const [selectedService, setSelectedService] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('conflicts');
 
-  useEffect(() => {
-    fetch('/api/v1/services/conflicts')
-      .then(r => r.json())
+  const loadConflicts = () => {
+    setLoading(true);
+    setView('conflicts');
+    // Asegúrate de que esta URL existe en tu FastAPI. Si no, cámbiala por "/api/v1/services/"
+    fetch('/api/v1/services/') 
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then(data => {
-        setServices(data)
-        setLoading(false)
+        // Filtramos solo los que requieren atención
+        const conflicts = data.filter(s => s.requires_attention);
+        setServices(conflicts);
+        setSelectedService(null);
+        setLoading(false);
       })
       .catch(e => {
-        console.error(e)
-        setLoading(false)
+        console.error('Error cargando conflictos:', e);
+        setLoading(false);
+      });
+  };
+
+  const loadDictionary = () => {
+    setLoading(true);
+    setView('dictionary');
+    fetch('/api/v1/services/')
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
       })
-  }, [])
+      .then(data => {
+        // Filtramos los que NO requieren atención
+        const resolved = data.filter(s => !s.requires_attention);
+        setServices(resolved);
+        setSelectedService(null);
+        setLoading(false);
+      })
+      .catch(e => {
+        console.error('Error cargando diccionario:', e);
+        setLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    loadConflicts();
+  }, []);
 
   return (
     <div className="container">
       <header>
-        <h1>🔧 Gestor de Conflictos</h1>
-        <p>Resuelve conflictos entre iteraciones de servicios</p>
+        <h1>🔧 Gestor de Conflictos de Servicios</h1>
+        <p>Resuelve conflictos entre iteraciones de datos del perímetro</p>
+        <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+          <button className="btn-header" onClick={loadConflicts}>
+            🔄 Recargar Conflictos
+          </button>
+          <button className="btn-header" onClick={loadDictionary}>
+            📚 Ver Diccionario Resuelto
+          </button>
+        </div>
       </header>
 
       <div className="panel">
         {loading ? (
-          <div className="loading">Cargando conflictos...</div>
+          <div className="loading">⏳ Cargando {view === 'conflicts' ? 'conflictos' : 'diccionario'}...</div>
         ) : services.length === 0 ? (
-          <div className="empty">✨ No hay conflictos pendientes</div>
+          <div className="empty">✨ {view === 'conflicts' ? 'No hay conflictos pendientes' : 'Diccionario vacío'}</div>
         ) : (
           <>
-            <h2>⚠️ Conflictos ({services.length})</h2>
+            <h2>{view === 'conflicts' ? '⚠️ Conflictos' : '📚 Diccionario'} ({services.length})</h2>
             {services.map(service => (
               <div
                 key={service.service_name}
@@ -42,9 +85,15 @@ export default function App() {
                 onClick={() => setSelectedService(service)}
               >
                 <div className="service-name">{service.service_name}</div>
-                <span className={`badge ${service.is_in_dictionary ? 'badge-dict' : ''}`}>
-                  {service.is_in_dictionary ? '📚 En diccionario' : '🆕 Nuevo'}
-                </span>
+                <div style={{ fontSize: '12px', color: view === 'conflicts' ? 'inherit' : '#555', marginTop: '4px' }}>
+                  {service.is_in_dictionary && <span className="badge badge-dict">📚 En diccionario</span>}
+                  {!service.is_in_dictionary && <span className="badge" style={{ background: '#fff3cd', color: '#856404' }}>🆕 Nuevo</span>}
+                  {service.perimeter_iterations?.length > 0 && (
+                    <span style={{ marginLeft: '6px', fontSize: '11px', opacity: 0.7 }}>
+                      • {service.perimeter_iterations.length} iteraciones
+                    </span>
+                  )}
+                </div>
               </div>
             ))}
           </>
@@ -55,9 +104,9 @@ export default function App() {
         {selectedService ? (
           <IterationReview service={selectedService} />
         ) : (
-          <div className="empty">Selecciona un servicio para revisar iteraciones</div>
+          <div className="empty">👈 Selecciona un servicio para revisar {view === 'conflicts' ? 'iteraciones y conflictos' : 'detalles'}</div>
         )}
       </div>
     </div>
-  )
+  );
 }
