@@ -16,3 +16,11 @@ class MongoRepository:
         if data_to_insert:
             self.collection.insert_many(data_to_insert)
             print(f"✅ Se han insertado {len(data_to_insert)} registros en MongoDB.")
+    
+    def get_all(self):
+        """Devuelve todos los documentos de la colección."""
+        return list(self.collection.find({}))
+
+    def get_by_id(self, item_id: str):
+        """Busca un documento específico por su _id."""
+        return self.collection.find_one({"_id": item_id})

@@ -1,0 +1,19 @@
+from app.infrastructure.persistence.mongoRepository import MongoRepository
+
+class CatalogService:
+    def __init__(self):
+        # El servicio asume la responsabilidad de conectar con la persistencia
+        self.repo = MongoRepository()
+
+    def get_full_catalog(self):
+        """
+        Orquesta la obtención de todo el catálogo.
+        Aquí reside la lógica de negocio aplicable antes de devolver los datos.
+        """
+        return self.repo.get_all()
+    
+    def get_catalog_item(self, item_id: str):
+        """
+        Orquesta la obtención de un servicio específico.
+        """
+        return self.repo.get_by_id(item_id)
