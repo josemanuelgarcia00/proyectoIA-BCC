@@ -1,5 +1,5 @@
 import pandas as pd 
-from app.domain.models import ExcelRowData, PerimeterIteration, CellConflict, ServiceDocument
+from app.domain.service import ExcelRowData, PerimeterIteration, CellConflict, ServiceDocument
 
 class ComparatorService:
     def reconcile(self, dictionary_rows, perimeter_rows) -> list[ServiceDocument]:

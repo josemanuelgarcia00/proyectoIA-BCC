@@ -1,6 +1,6 @@
-from app.infrastructure.persistence.mongoRepository import MongoRepository
+from app.infrastructure.persistence.serviceRepository import MongoRepository
 
-class CatalogService:
+class ServiceService:
     def __init__(self):
         # El servicio asume la responsabilidad de conectar con la persistencia
         self.repo = MongoRepository()

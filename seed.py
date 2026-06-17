@@ -1,7 +1,7 @@
 import os
 from app.application.syncService import SyncService 
 from app.infrastructure.storage.excelReader import ExcelReader
-from app.infrastructure.persistence.mongoRepository import MongoRepository
+from app.infrastructure.persistence.serviceRepository import MongoRepository
 from app.application.comparatorService import ComparatorService
 
 def run_seed():
