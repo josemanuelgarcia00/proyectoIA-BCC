@@ -33,3 +33,26 @@ env/
 # ==========================================
 .DS_Store
 Thumbs.db
+
+# ==========================================
+# Node / Frontend
+# ==========================================
+node_modules/
+dist/
+build/
+
+# ==========================================
+# Logs y cachés varios
+# ==========================================
+*.log
+.pytest_cache/
+.coverage
+.ipynb_checkpoints/
+
+# ==========================================
+# Herramientas de agentes/IA (Claude Code, etc.)
+# ==========================================
+.agents/
+.claude/
+graphify-out/
+skills-lock.json
