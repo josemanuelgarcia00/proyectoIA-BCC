@@ -5,10 +5,164 @@ Implementa la lógica de decisiones basada en iteraciones múltiples
 from typing import List, Optional, Dict, Tuple
 from app.domain.service import ServiceEntity, PerimeterIteration, ExcelRowData, CellConflict
 
+# Campos del modelo que se representan como listas (la unificación hace un merge/unión)
+LIST_FIELDS = {"inputs", "outputs", "invokes", "reference_tables"}
+
 
 class ConflictResolver:
     """Resuelve conflictos entre iteraciones del perímetro"""
-    
+
+    @staticmethod
+    def _merge_values(previous_value, current_value, field_name: str):
+        """Combina el valor anterior y la nueva propuesta en lugar de elegir uno solo"""
+        if field_name in LIST_FIELDS:
+            merged = list(previous_value) if previous_value else []
+            for item in (current_value or []):
+                if item not in merged:
+                    merged.append(item)
+            return merged
+
+        previous_value = previous_value or ""
+        current_value = current_value or ""
+        if not previous_value:
+            return current_value
+        if not current_value or current_value == previous_value:
+            return previous_value
+        return f"{previous_value} / {current_value}"
+
+    @staticmethod
+    def resolve_iteration(
+        service: ServiceEntity,
+        iteration_id: int,
+        resolution: str = "unify"
+    ) -> Optional[PerimeterIteration]:
+        """
+        Resuelve TODOS los conflictos de una iteración contra su línea base en cascada
+        (la 1ª iteración se compara con el Diccionario final/winning_data; el resto,
+        con la iteración inmediatamente anterior, que puede ya incluir uniones previas):
+        - "unify": une ambos valores (listas por unión, texto concatenado si difieren).
+          No se elimina ni se sobrescribe nada.
+        - "reject": descarta la nueva propuesta de esta iteración y mantiene la línea
+          base. El dato original sigue recuperable con "volver atrás" en cualquier momento.
+        Devuelve la iteración afectada, o None si no existe.
+        """
+        iterations = service.perimeter_iterations
+        idx = next(
+            (i for i, it in enumerate(iterations) if it.iteration_id == iteration_id),
+            None
+        )
+        if idx is None:
+            return None
+
+        iteration = iterations[idx]
+        baseline_data = iterations[idx - 1].data if idx > 0 else service.winning_data
+
+        for conflict in iteration.conflicts:
+            if conflict.column == "document":
+                # Documento de origen y versión siempre van juntos como un par
+                if resolution == "reject" and baseline_data:
+                    iteration.data.source_document = baseline_data.source_document
+                    iteration.data.doc_version = baseline_data.doc_version
+                elif resolution != "reject":
+                    base_doc = baseline_data.source_document if baseline_data else iteration.data.source_document
+                    base_version = baseline_data.doc_version if baseline_data else iteration.data.doc_version
+                    iteration.data.source_document = ConflictResolver._merge_values(
+                        base_doc, iteration.data.source_document, "source_document"
+                    )
+                    iteration.data.doc_version = ConflictResolver._merge_values(
+                        base_version, iteration.data.doc_version, "doc_version"
+                    )
+                continue
+
+            current_value = getattr(iteration.data, conflict.column)
+            baseline_value = getattr(baseline_data, conflict.column) if baseline_data else current_value
+
+            if resolution == "reject":
+                setattr(iteration.data, conflict.column, baseline_value)
+            else:
+                merged = ConflictResolver._merge_values(baseline_value, current_value, conflict.column)
+                setattr(iteration.data, conflict.column, merged)
+
+        iteration.conflicts = []
+        iteration.resolution = resolution
+        service.consolidated_status = ConflictResolver._compute_status(service)
+        return iteration
+
+    @staticmethod
+    def _compute_status(service: ServiceEntity) -> str:
+        if any(it.conflicts for it in service.perimeter_iterations):
+            return "En revision"
+        if any(it.resolution == "unify" for it in service.perimeter_iterations):
+            return "Unificado"
+        return "Aceptado"
+
+    @staticmethod
+    def revert_iteration(service: ServiceEntity, iteration_id: int) -> Optional[PerimeterIteration]:
+        """
+        Vuelve atrás la resolución aplicada a una iteración concreta, restaurando
+        su estado original (datos y conflictos) tal y como se leyó del Excel.
+        """
+        iteration = next(
+            (it for it in service.perimeter_iterations if it.iteration_id == iteration_id),
+            None
+        )
+        if not iteration or iteration.original_data is None:
+            return None
+
+        iteration.data = iteration.original_data.model_copy(deep=True)
+        iteration.conflicts = [c.model_copy(deep=True) for c in iteration.original_conflicts]
+        iteration.resolution = None
+
+        service.closed = False
+        service.consolidated_status = ConflictResolver._compute_status(service)
+        return iteration
+
+    @staticmethod
+    def reset_service(service: ServiceEntity) -> ServiceEntity:
+        """Reinicia TODAS las iteraciones del servicio a su estado original (deshace toda la revisión)"""
+        for iteration in service.perimeter_iterations:
+            if iteration.original_data is not None:
+                iteration.data = iteration.original_data.model_copy(deep=True)
+                iteration.conflicts = [c.model_copy(deep=True) for c in iteration.original_conflicts]
+                iteration.resolution = None
+
+        service.closed = False
+        service.consolidated_status = ConflictResolver._compute_status(service)
+        return service
+
+    @staticmethod
+    def preview_final_merge(service: ServiceEntity) -> Optional[ExcelRowData]:
+        """
+        Calcula (sin aplicar nada) cómo quedaría el dato final para el Diccionario.
+        La cascada de uniones ya incorpora el Diccionario maestro desde la 1ª
+        iteración, así que el resultado es simplemente el de la última iteración
+        ya revisada (no se vuelve a unir con el maestro para no duplicar texto).
+        Devuelve None si todavía quedan conflictos pendientes o no hay iteraciones.
+        """
+        if any(it.conflicts for it in service.perimeter_iterations):
+            return None
+        if not service.perimeter_iterations:
+            return None
+
+        return service.perimeter_iterations[-1].data.model_copy(deep=True)
+
+    @staticmethod
+    def accept_and_close(service: ServiceEntity) -> Optional[ServiceEntity]:
+        """
+        Cierra el servicio: fija el resultado final de la revisión (última iteración,
+        ya unificada en cascada con el Diccionario) como dato maestro definitivo.
+        Devuelve None si todavía quedan conflictos pendientes.
+        """
+        merged = ConflictResolver.preview_final_merge(service)
+        if merged is None:
+            return None
+
+        service.winning_data = merged
+        service.exists_in_dictionary = "Si"
+        service.closed = True
+        service.consolidated_status = "Cerrado"
+        return service
+
     @staticmethod
     def resolve_iterations(service: ServiceEntity) -> Tuple[ServiceEntity, Dict]:
         """

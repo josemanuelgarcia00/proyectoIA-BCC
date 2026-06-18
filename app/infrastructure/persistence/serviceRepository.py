@@ -4,9 +4,26 @@ import os
 
 
 class MongoRepository:
-    """Repositorio que lee servicios desde Excel"""
-    
+    """Repositorio que lee servicios desde Excel y los cachea en memoria (singleton).
+
+    Es singleton porque cada request HTTP instancia ServiceService() de nuevo;
+    si no se compartiera la instancia, cualquier resolución de conflictos se
+    perdería en la siguiente petición al recrearse el cache desde el Excel.
+    """
+
+    _instance = None
+
+    def __new__(cls, excel_path: str = None):
+        if cls._instance is None:
+            instance = super().__new__(cls)
+            instance._initialized = False
+            cls._instance = instance
+        return cls._instance
+
     def __init__(self, excel_path: str = None):
+        if self._initialized:
+            return
+
         # Usar ruta por defecto: data/CARGA_SERVICIOS.xlsx
         if excel_path is None:
             excel_path = os.path.join(
@@ -15,10 +32,11 @@ class MongoRepository:
                 "data",
                 "CARGA_SERVICIOS.xlsx"
             )
-        
+
         self.excel_path = excel_path
         self.services_cache = None
         self._load_services()
+        self._initialized = True
 
     def _load_services(self):
         """Carga los servicios desde Excel la primera vez"""

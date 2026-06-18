@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 import re
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 from app.domain.service import (
     ServiceEntity, PerimeterIteration, ExcelRowData, CellConflict
 )
@@ -93,17 +93,18 @@ class ExcelReader:
                 iteration_id = idx + 1
                 excel_row_data = self._record_to_excel_row_data(entry['record'])
 
-                # Detectar conflictos comparando con iteraciones anteriores
-                conflicts = self._detect_conflicts_with_previous(
-                    excel_row_data,
-                    iterations,
-                    entry['record']
-                )
+                # La línea base de comparación es en cascada: la 1ª iteración se
+                # compara contra el Diccionario final (maestro); cada iteración
+                # siguiente se compara contra la inmediatamente anterior.
+                baseline_data = master_data if idx == 0 else iterations[idx - 1].data
+                conflicts = self._detect_conflicts(excel_row_data, baseline_data)
 
                 iteration = PerimeterIteration(
                     iteration_id=iteration_id,
                     data=excel_row_data,
-                    conflicts=conflicts
+                    conflicts=conflicts,
+                    original_data=excel_row_data.model_copy(deep=True),
+                    original_conflicts=[c.model_copy(deep=True) for c in conflicts]
                 )
                 iterations.append(iteration)
 
@@ -176,55 +177,55 @@ class ExcelReader:
             reliability=get_field(['reliability', 'confiabilidad', 'fiabilidad'], "Media")
         )
 
-    def _detect_conflicts_with_previous(
+    def _detect_conflicts(
         self,
         current_data: ExcelRowData,
-        previous_iterations: List[PerimeterIteration],
-        current_record: Dict
+        baseline_data: Optional[ExcelRowData]
     ) -> List[CellConflict]:
         """
-        Detecta conflictos comparando la iteración actual con las anteriores.
+        Detecta conflictos comparando los datos actuales contra una línea base
+        (el Diccionario final para la 1ª iteración, o la iteración anterior para
+        el resto). Si no hay línea base (servicio nuevo, no está en el Diccionario),
+        no hay nada con qué comparar y por tanto no se detectan conflictos.
         """
-        if not previous_iterations:
+        if baseline_data is None:
             return []
-        
+
         conflicts = []
-        
-        # Campos a comparar
+
+        # Campos a comparar de forma individual (documento y versión se tratan
+        # aparte, como un único par, ver más abajo)
         fields_to_check = [
-            ('app', 'app'),
-            ('type', 'type'),
-            ('verb', 'verb'),
-            ('scope', 'scope'),
-            ('functional_use', 'functional_use'),
-            ('inputs', 'inputs'),
-            ('outputs', 'outputs'),
-            ('invokes', 'invokes'),
-            ('reference_tables', 'reference_tables'),
-            ('source_document', 'source_document'),
-            ('doc_version', 'doc_version'),
-            ('reliability', 'reliability')
+            'app', 'type', 'verb', 'scope', 'functional_use',
+            'inputs', 'outputs', 'invokes', 'reference_tables',
+            'reliability'
         ]
-        
-        # Comparar con la PRIMERA iteración (línea de base)
-        first_iteration = previous_iterations[0]
-        
-        for field_name, attr_name in fields_to_check:
+
+        for attr_name in fields_to_check:
             current_value = getattr(current_data, attr_name)
-            base_value = getattr(first_iteration.data, attr_name)
-            
+            base_value = getattr(baseline_data, attr_name)
+
             # Normalizar para comparación
-            if isinstance(current_value, list):
-                current_value = sorted(current_value)
-            if isinstance(base_value, list):
-                base_value = sorted(base_value)
-            
+            current_value_cmp = sorted(current_value) if isinstance(current_value, list) else current_value
+            base_value_cmp = sorted(base_value) if isinstance(base_value, list) else base_value
+
             # Si son diferentes, registrar conflicto
-            if str(current_value) != str(base_value):
+            if str(current_value_cmp) != str(base_value_cmp):
                 conflicts.append(CellConflict(
-                    column=field_name,
+                    column=attr_name,
                     dictionary_base_value=str(base_value),
                     perimeter_new_proposal=str(current_value)
                 ))
-        
+
+        # Documento de origen y versión siempre forman un par: si cualquiera de
+        # los dos cambia, se reporta como un único conflicto conjunto.
+        current_doc = (current_data.source_document, current_data.doc_version)
+        base_doc = (baseline_data.source_document, baseline_data.doc_version)
+        if current_doc != base_doc:
+            conflicts.append(CellConflict(
+                column='document',
+                dictionary_base_value=f"{base_doc[0]} (v{base_doc[1]})",
+                perimeter_new_proposal=f"{current_doc[0]} (v{current_doc[1]})"
+            ))
+
         return conflicts

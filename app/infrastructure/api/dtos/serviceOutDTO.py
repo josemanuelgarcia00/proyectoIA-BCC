@@ -31,6 +31,7 @@ class PerimeterIterationResponseDTO(BaseModel):
     iteration_id: int
     data: ExcelRowDataResponseDTO
     conflicts: List[CellConflictResponseDTO]
+    resolution: Optional[str] = None
 
 
 class ServiceResponseDTO(BaseModel):
@@ -39,6 +40,7 @@ class ServiceResponseDTO(BaseModel):
     status: str
     is_in_dictionary: bool
     requires_attention: bool  # Calculado a partir de la lógica de negocio
+    closed: bool = False
     dictionary_data: Optional[ExcelRowDataResponseDTO] = None  # Datos del maestro
     perimeter_iterations: List[PerimeterIterationResponseDTO]
 
@@ -73,7 +75,8 @@ class ServiceResponseDTO(BaseModel):
             iterations_dto.append(PerimeterIterationResponseDTO(
                 iteration_id=it.iteration_id,
                 data=data_dto,
-                conflicts=conflicts_dto
+                conflicts=conflicts_dto,
+                resolution=it.resolution
             ))
 
         # --- Mapeo de los datos del diccionario si existen ---
@@ -100,6 +103,7 @@ class ServiceResponseDTO(BaseModel):
             status=entity.consolidated_status,
             is_in_dictionary=True if entity.exists_in_dictionary.lower() == "si" else False,
             requires_attention=entity.has_critical_conflicts(),
+            closed=entity.closed,
             dictionary_data=dict_data_dto,
             perimeter_iterations=iterations_dto
         )

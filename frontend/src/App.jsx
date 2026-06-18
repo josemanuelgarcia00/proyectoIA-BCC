@@ -10,14 +10,23 @@ export default function App() {
   
   // 1. NUEVO ESTADO: Guardará lo que el usuario escriba en el buscador
   const [searchTerm, setSearchTerm] = useState('');
+  const [toast, setToast] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const showToast = (text) => {
+    setToast(text);
+    setTimeout(() => setToast(null), 5000);
+  };
 
   const loadConflicts = () => {
     setLoading(true);
     setView('conflicts');
     setSearchTerm(''); // Limpiamos el buscador al cambiar de pestaña
-    
-    // Asegúrate de que esta URL existe en tu FastAPI. Si no, cámbiala por "/api/v1/services/"
-    fetch('/api/v1/services/') 
+
+    // Recarga desde el Excel de origen y luego trae el catálogo actualizado
+    fetch('/api/v1/services/refresh', { method: 'POST' })
+      .catch(() => {})
+      .then(() => fetch('/api/v1/services/'))
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -58,6 +67,29 @@ export default function App() {
       });
   };
 
+  const saveToExcel = () => {
+    const confirmed = window.confirm(
+      '¿Seguro que quieres sobrescribir el Diccionario final en el Excel? Esta acción no se puede deshacer.'
+    );
+    if (!confirmed) return;
+
+    setSaving(true);
+    fetch('/api/v1/services/save-to-excel', { method: 'POST' })
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(data => {
+        if (data.saved) {
+          showToast(`💾 Guardado en Excel: ${data.services_written} servicio(s) volcados al Diccionario`);
+        } else {
+          showToast(`⚠️ Aún quedan ${data.pending_services} servicio(s) con conflictos sin revisar`);
+        }
+      })
+      .catch(e => showToast(`❌ Error al guardar: ${e.message}`))
+      .finally(() => setSaving(false));
+  };
+
   useEffect(() => {
     loadConflicts();
   }, []);
@@ -78,6 +110,9 @@ export default function App() {
           </button>
           <button className="btn-header" onClick={loadDictionary}>
             📚 Ver Diccionario Resuelto
+          </button>
+          <button className="btn-header" onClick={saveToExcel} disabled={saving}>
+            {saving ? '⏳ Guardando...' : '🗂️ Sobrescribir Diccionario Final'}
           </button>
         </div>
       </header>
@@ -148,11 +183,36 @@ export default function App() {
 
       <div className="panel">
         {selectedService ? (
-          <IterationReview service={selectedService} />
+          <IterationReview
+            service={selectedService}
+            onServiceClosed={(name) => {
+              setServices(prev => prev.filter(s => s.service_name !== name));
+              setSelectedService(null);
+            }}
+          />
         ) : (
           <div className="empty">👈 Selecciona un servicio para revisar {view === 'conflicts' ? 'iteraciones y conflictos' : 'detalles'}</div>
         )}
       </div>
+
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          background: toast.startsWith('❌') ? 'var(--error)' : (toast.startsWith('⚠️') ? 'var(--warning)' : 'var(--primary-dark)'),
+          color: 'white',
+          padding: '14px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+          fontWeight: 600,
+          fontSize: '14px',
+          zIndex: 1000,
+          maxWidth: '360px'
+        }}>
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

@@ -33,6 +33,10 @@ class PerimeterIteration(BaseModel):
     iteration_id: int
     data: ExcelRowData
     conflicts: List[CellConflict] = []
+    resolution: Optional[str] = None  # "perimeter" | "reject" | "unify", una vez revisada
+    # Snapshot del estado original (antes de cualquier resolución), para poder volver atrás
+    original_data: Optional[ExcelRowData] = None
+    original_conflicts: List[CellConflict] = []
 
 
 class ServiceEntity(BaseModel):
@@ -43,6 +47,7 @@ class ServiceEntity(BaseModel):
     winning_data: Optional[ExcelRowData] = None
     dictionary_data: Optional[dict] = None
     perimeter_iterations: List[PerimeterIteration] = []
+    closed: bool = False  # True cuando el usuario aceptó la revisión final y cerró el servicio
 
     def has_critical_conflicts(self) -> bool:
         """Método de negocio: determina si hay conflictos críticos"""

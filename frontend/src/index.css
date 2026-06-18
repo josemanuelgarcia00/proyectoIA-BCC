@@ -285,8 +285,17 @@ button:active {
   color: white;
 }
 
-.btn-reject:hover { 
-  background-color: #b71c1c; 
+.btn-reject:hover {
+  background-color: #b71c1c;
+}
+
+.btn-unify {
+  background-color: var(--success);
+  color: white;
+}
+
+.btn-unify:hover {
+  background-color: #205c24;
 }
 
 /* --- ESTADOS GENERALES --- */
