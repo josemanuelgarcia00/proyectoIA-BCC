@@ -482,7 +482,7 @@ export default function IterationReview({ service, onServiceClosed }) {
           <div key={currentIteration.iteration_id} className="field-diff">
 
             <div className="iteration-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Asiento {currentIteration.iteration_id}</span>
+              <span>Iteración {currentIteration.iteration_id}</span>
               <span className="folio-count">Punto {currentPosition} de {totalConflictIterations}</span>
             </div>
 
@@ -587,7 +587,7 @@ export default function IterationReview({ service, onServiceClosed }) {
 
       {resolvedIterations.length > 0 && (
         <div style={{ marginTop: '20px' }}>
-          <h4 className="subhead">Asientos ya revisados</h4>
+          <h4 className="subhead">Iteraciones ya revisadas</h4>
           {resolvedIterations.map(it => {
             const stamp = resolutionStamp(it.resolution);
             return (
@@ -600,7 +600,7 @@ export default function IterationReview({ service, onServiceClosed }) {
                 }}
               >
                 <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="mono">Asiento {it.iteration_id}</span>
+                  <span className="mono">Iteración {it.iteration_id}</span>
                   <span className={`stamp ${stamp.cls}`}>{stamp.label}</span>
                 </span>
                 <button

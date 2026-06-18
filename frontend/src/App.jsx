@@ -73,11 +73,6 @@ export default function App() {
   };
 
   const saveToExcel = () => {
-    const confirmed = window.confirm(
-      '¿Seguro que quieres sobrescribir el Diccionario final en el Excel? Esta acción no se puede deshacer.'
-    );
-    if (!confirmed) return;
-
     setSaving(true);
     fetch('/api/v1/services/save-to-excel', { method: 'POST' })
       .then(r => {

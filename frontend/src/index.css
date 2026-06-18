@@ -1,39 +1,39 @@
 /* --- index.css ---
-   Sistema visual "libro de registro": la identidad Cajamar (teal + naranja)
+   Sistema visual "libro de registro": la identidad Cajamar (turquesa + rojo)
    aplicada con la disciplina de un registro contable, no de un dashboard SaaS.
 */
 
 :root {
-  /* Marca Cajamar — sin modificar */
-  --primary: #008a9b;
-  --primary-dark: #005c67;
-  --primary-light: #e8f3f4;
-  --accent: #f08100;
-  --accent-light: #f9b200;
+  /* Marca Cajamar — Colores corporativos actualizados */
+  --primary: #00A19A;       /* Turquesa Cajamar (logo corporativo) */
+  --primary-dark: #00726D;  /* Turquesa oscuro para interacciones */
+  --primary-light: #e2f4f2; /* Fondo suave para elementos activos */
+  --accent: #d21022;        /* Rojo Cajamar */
+  --accent-light: #fadfdf;  /* Rojo suave para fondos de alerta */
 
-  /* Neutros de registro: papel, tinta, regla */
-  --ink: #15302f;
-  --paper: #f4f6f5;
-  --rule: #c7d8d8;
-  --rule-strong: #9fb8b9;
+  /* Neutros de registro: papel, tinta, regla (con subtono turquesa/frío) */
+  --ink: #13262a;           /* Texto principal, casi negro pero entonado en turquesa */
+  --paper: #f5f7f7;         /* Fondo base, blanco roto "papel" */
+  --rule: #ccd6d5;          /* Líneas divisorias suaves */
+  --rule-strong: #8fa9a7;   /* Líneas divisorias marcadas */
 
   /* Semántica de sello — versiones desaturadas de éxito/error/aviso */
-  --moss: #3c6b53;
-  --moss-light: #e3ede7;
-  --rust: #9c3b2c;
-  --rust-light: #f3e3df;
-  --amber-ink: #8a4d00;
+  --moss: #1f7a6c;          /* Éxito (verde-turquesa, próximo al primario) */
+  --moss-light: #dff3ef;
+  --rust: #a61b24;          /* Error (basado en el rojo corporativo oscurecido) */
+  --rust-light: #f9e6e8;
+  --amber-ink: #8a4d00;     /* Aviso */
   --amber-light: #fdf0dc;
 
   /* Alias retro-compatibles (usados como var() en estilos en línea existentes) */
-  --success: #3c6b53;
-  --error: #9c3b2c;
+  --success: var(--moss);
+  --error: var(--accent);
   --warning: #f9b200;
-  --text: #15302f;
-  --text-muted: #5b7372;
-  --text-light: #5b7372;
-  --border: #c7d8d8;
-  --bg: #f4f6f5;
+  --text: var(--ink);
+  --text-muted: #4f6b69;
+  --text-light: #4f6b69;
+  --border: var(--rule);
+  --bg: var(--paper);
 
   --font-sans: 'IBM Plex Sans', 'Segoe UI', Tahoma, sans-serif;
   --font-mono: 'IBM Plex Mono', 'Consolas', 'Courier New', monospace;
@@ -85,9 +85,9 @@ body {
 ========================================= */
 header {
   grid-column: 1 / -1;
-  background-color: var(--ink);
+  background-color: var(--primary);
   padding: 20px 26px;
-  border-bottom: 3px solid var(--accent);
+  border-bottom: 3px solid var(--primary-dark); /* Remate en turquesa oscuro */
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -99,7 +99,7 @@ header .eyebrow {
   font-weight: 500;
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: var(--accent-light);
+  color: rgba(255, 255, 255, 0.75); /* Contraste suave sobre el turquesa */
   margin-bottom: 6px;
 }
 
@@ -159,7 +159,7 @@ header p {
 
 .service-item.active {
   background-color: var(--primary-light);
-  border-left-color: var(--primary);
+  border-left-color: var(--primary); /* Marca activa en Verde Cajamar */
 }
 
 .service-name {
@@ -183,14 +183,13 @@ header p {
   font-weight: 600;
   letter-spacing: 1.2px;
   text-transform: uppercase;
-  transform: rotate(-2deg);
   white-space: nowrap;
   animation: stamp-in 0.16s ease-out;
 }
 
 @keyframes stamp-in {
-  from { transform: rotate(-2deg) scale(1.35); opacity: 0; }
-  to { transform: rotate(-2deg) scale(1); opacity: 1; }
+  from { transform: scale(1.35); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -339,19 +338,19 @@ header p {
   letter-spacing: 0.8px;
 }
 
-/* Línea informativa de una sola fila (p.ej. aviso de servicio nuevo) */
+/* Línea informativa de una sola fila */
 .info-line {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  background: var(--amber-light);
-  border-left: 2px solid var(--accent);
+  background: var(--primary-light); /* Tono informativo, no de alerta */
+  border-left: 2px solid var(--primary);
   font-size: 13px;
   color: var(--ink);
 }
 
-/* Título de subsección anidada (más discreto que .data-card h3) */
+/* Título de subsección anidada */
 .subhead {
   font-size: 11px;
   font-weight: 600;
@@ -361,11 +360,11 @@ header p {
   margin-bottom: 14px;
 }
 
-/* Bloque que agrupa los conflictos detectados dentro de un asiento */
+/* Bloque que agrupa los conflictos detectados dentro de una iteración */
 .conflict-block {
   background: var(--paper);
   padding: 16px;
-  border-left: 2px solid var(--accent);
+  border-left: 2px solid var(--accent); /* Alerta roja indicando conflicto */
   margin-top: 16px;
 }
 
@@ -438,17 +437,17 @@ button:disabled {
 }
 
 .btn-accept {
-  background-color: var(--accent);
+  background-color: var(--primary); /* Aceptar con el Verde principal */
   color: white;
 }
 
 .btn-unify {
-  background-color: var(--primary);
+  background-color: var(--primary-dark); /* Unificar con el turquesa oscuro */
   color: white;
 }
 
 .btn-reject {
-  background-color: var(--rust);
+  background-color: var(--accent); /* Rechazar con el Rojo Cajamar */
   color: white;
 }
 

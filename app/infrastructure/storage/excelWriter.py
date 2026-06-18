@@ -1,6 +1,8 @@
+import re
 import pandas as pd
 from typing import List
 from app.domain.service import ServiceEntity, ExcelRowData
+from app.infrastructure.storage.excelReader import ExcelReader
 
 DICTIONARY_COLUMNS = [
     "servicio", "app", "tipo", "verbo", "ambito", "uso_funcional",
@@ -17,11 +19,15 @@ class ExcelWriter:
 
     def save_dictionary(self, services: List[ServiceEntity]) -> int:
         """
-        Vuelca el dato final de cada servicio (su última iteración, ya sin conflictos
-        pendientes) a la hoja Diccionario, sobrescribiéndola. La hoja Perímetro no se toca.
-        Devuelve el número de servicios escritos.
+        Hace un upsert del dato final de cada servicio revisado (su última iteración,
+        ya sin conflictos pendientes) sobre la hoja Diccionario: si el servicio ya
+        existe se sobrescribe su fila, si no existe se añade. Las filas de servicios
+        no tocados en esta sesión se conservan. La hoja Perímetro no se toca.
+        Devuelve el número de servicios escritos (añadidos o sobrescritos).
         """
-        rows = []
+        rows_by_service = self._read_existing_dictionary()
+
+        upserted = 0
         for service in services:
             if not service.perimeter_iterations:
                 continue
@@ -31,17 +37,42 @@ class ExcelWriter:
             # Si el servicio fue cerrado ("Aceptar Cambios"), winning_data ya es el
             # resultado unificado con el maestro; si no, usamos la última iteración.
             final_data = service.winning_data if service.closed and service.winning_data else service.perimeter_iterations[-1].data
-            rows.append(self._row_from_data(service.name, final_data))
+            rows_by_service[service.name] = self._row_from_data(service.name, final_data)
+            upserted += 1
 
-        if not rows:
+        if upserted == 0:
             return 0
 
-        df = pd.DataFrame(rows, columns=DICTIONARY_COLUMNS)
+        df = pd.DataFrame(rows_by_service.values(), columns=DICTIONARY_COLUMNS)
 
         with pd.ExcelWriter(self.file_path, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
             df.to_excel(writer, sheet_name="Diccionario", index=False)
 
-        return len(rows)
+        return upserted
+
+    def _read_existing_dictionary(self) -> dict:
+        """
+        Lee la hoja Diccionario actual y normaliza cada fila al formato de escritura,
+        indexada por nombre de servicio, para poder hacer upsert sin perder las filas
+        que ya existían y no se tocan en esta sesión.
+        """
+        try:
+            reader = ExcelReader(self.file_path)
+            dictionary_records, _ = reader.read_excel_sheets()
+        except (FileNotFoundError, ValueError):
+            return {}
+
+        existing = {}
+        for record in dictionary_records:
+            raw_key = str(record.get(list(record.keys())[0], "")).strip()
+            if not raw_key or raw_key.lower() == "nan":
+                continue
+
+            service_name = re.sub(r'\s\(\d+\)$', '', raw_key).strip().upper()
+            row_data = reader._record_to_excel_row_data(record)
+            existing[service_name] = self._row_from_data(service_name, row_data)
+
+        return existing
 
     @staticmethod
     def _row_from_data(service_name: str, data: ExcelRowData) -> dict:
