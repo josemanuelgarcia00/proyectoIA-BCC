@@ -7,10 +7,15 @@ export default function App() {
   const [selectedService, setSelectedService] = useState(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('conflicts');
+  
+  // 1. NUEVO ESTADO: Guardará lo que el usuario escriba en el buscador
+  const [searchTerm, setSearchTerm] = useState('');
 
   const loadConflicts = () => {
     setLoading(true);
     setView('conflicts');
+    setSearchTerm(''); // Limpiamos el buscador al cambiar de pestaña
+    
     // Asegúrate de que esta URL existe en tu FastAPI. Si no, cámbiala por "/api/v1/services/"
     fetch('/api/v1/services/') 
       .then(r => {
@@ -33,6 +38,8 @@ export default function App() {
   const loadDictionary = () => {
     setLoading(true);
     setView('dictionary');
+    setSearchTerm(''); // Limpiamos el buscador al cambiar de pestaña
+    
     fetch('/api/v1/services/')
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -54,6 +61,11 @@ export default function App() {
   useEffect(() => {
     loadConflicts();
   }, []);
+
+  // 2. LÓGICA DE FILTRADO: Comparamos el nombre del servicio con el término de búsqueda
+  const filteredServices = services.filter(service => 
+    service.service_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="container">
@@ -77,25 +89,59 @@ export default function App() {
           <div className="empty">✨ {view === 'conflicts' ? 'No hay conflictos pendientes' : 'Diccionario vacío'}</div>
         ) : (
           <>
-            <h2>{view === 'conflicts' ? '⚠️ Conflictos' : '📚 Diccionario'} ({services.length})</h2>
-            {services.map(service => (
-              <div
-                key={service.service_name}
-                className={`service-item ${selectedService?.service_name === service.service_name ? 'active' : ''}`}
-                onClick={() => setSelectedService(service)}
-              >
-                <div className="service-name">{service.service_name}</div>
-                <div style={{ fontSize: '12px', color: view === 'conflicts' ? 'inherit' : '#555', marginTop: '4px' }}>
-                  {service.is_in_dictionary && <span className="badge badge-dict">📚 En diccionario</span>}
-                  {!service.is_in_dictionary && <span className="badge" style={{ background: '#fff3cd', color: '#856404' }}>🆕 Nuevo</span>}
-                  {service.perimeter_iterations?.length > 0 && (
-                    <span style={{ marginLeft: '6px', fontSize: '11px', opacity: 0.7 }}>
-                      • {service.perimeter_iterations.length} iteraciones
-                    </span>
-                  )}
-                </div>
+            <h2>
+              {view === 'conflicts' ? '⚠️ Conflictos' : '📚 Diccionario'} 
+              <span style={{ fontSize: '14px', color: 'var(--text-light)', marginLeft: '8px' }}>
+                ({filteredServices.length} de {services.length})
+              </span>
+            </h2>
+
+            {/* 3. INTERFAZ DEL BUSCADOR */}
+            <div style={{ marginBottom: '16px' }}>
+              <input 
+                type="text" 
+                placeholder="🔍 Buscar servicio por nombre..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border)',
+                  fontSize: '14px',
+                  outline: 'none',
+                  transition: 'border-color 0.3s'
+                }}
+                onFocus={(e) => e.target.style.borderColor = 'var(--accent)'}
+                onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
+              />
+            </div>
+
+            {/* 4. RENDERIZADO DE LA LISTA FILTRADA */}
+            {filteredServices.length === 0 ? (
+              <div className="empty" style={{ padding: '40px 20px' }}>
+                No se encontraron servicios que coincidan con "<strong>{searchTerm}</strong>"
               </div>
-            ))}
+            ) : (
+              filteredServices.map(service => (
+                <div
+                  key={service.service_name}
+                  className={`service-item ${selectedService?.service_name === service.service_name ? 'active' : ''}`}
+                  onClick={() => setSelectedService(service)}
+                >
+                  <div className="service-name">{service.service_name}</div>
+                  <div style={{ fontSize: '12px', color: view === 'conflicts' ? 'inherit' : '#555', marginTop: '4px' }}>
+                    {service.is_in_dictionary && <span className="badge badge-dict">📚 En diccionario</span>}
+                    {!service.is_in_dictionary && <span className="badge" style={{ background: '#fff3cd', color: '#856404' }}>🆕 Nuevo</span>}
+                    {service.perimeter_iterations?.length > 0 && (
+                      <span style={{ marginLeft: '6px', fontSize: '11px', opacity: 0.7 }}>
+                        • {service.perimeter_iterations.length} iteraciones
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </>
         )}
       </div>

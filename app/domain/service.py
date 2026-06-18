@@ -41,6 +41,7 @@ class ServiceEntity(BaseModel):
     exists_in_dictionary: str
     consolidated_status: str
     winning_data: Optional[ExcelRowData] = None
+    dictionary_data: Optional[dict] = None
     perimeter_iterations: List[PerimeterIteration] = []
 
     def has_critical_conflicts(self) -> bool:
