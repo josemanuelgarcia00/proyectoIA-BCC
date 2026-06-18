@@ -44,9 +44,12 @@ class ExcelReader:
         """
         Lee el perímetro y extrae servicios agrupados por nombre,
         detectando iteraciones (por números entre paréntesis) y conflictos.
+        También cruza cada servicio con la hoja Diccionario para poblar
+        sus datos maestros (winning_data / exists_in_dictionary).
         """
-        _, perimeter_records = self.read_excel_sheets()
-        
+        dictionary_records, perimeter_records = self.read_excel_sheets()
+        dictionary_index = self._build_dictionary_index(dictionary_records)
+
         if not perimeter_records:
             return []
         
@@ -80,40 +83,58 @@ class ExcelReader:
         for service_name, entries in services_map.items():
             # Ordenar por número de iteración
             entries.sort(key=lambda x: x['iteration_num'])
-            
+
+            # Datos maestros del servicio (si existe en el Diccionario)
+            master_data = dictionary_index.get(service_name)
+
             # Crear iteraciones
             iterations = []
             for idx, entry in enumerate(entries):
                 iteration_id = idx + 1
                 excel_row_data = self._record_to_excel_row_data(entry['record'])
-                
+
                 # Detectar conflictos comparando con iteraciones anteriores
                 conflicts = self._detect_conflicts_with_previous(
                     excel_row_data,
                     iterations,
                     entry['record']
                 )
-                
+
                 iteration = PerimeterIteration(
                     iteration_id=iteration_id,
                     data=excel_row_data,
                     conflicts=conflicts
                 )
                 iterations.append(iteration)
-            
+
             # Crear ServiceEntity
             service = ServiceEntity(
                 name=service_name,
-                exists_in_dictionary="Si",
+                exists_in_dictionary="Si" if master_data else "No",
                 consolidated_status="En revision" if any(
                     it.conflicts for it in iterations
                 ) else "Aceptado",
-                winning_data=None,
+                winning_data=master_data,
                 perimeter_iterations=iterations
             )
             services.append(service)
-        
+
         return services
+
+    def _build_dictionary_index(self, dictionary_records: List[Dict]) -> Dict[str, ExcelRowData]:
+        """
+        Construye un índice {nombre_servicio: ExcelRowData} a partir de la hoja Diccionario.
+        """
+        index = {}
+        for record in dictionary_records:
+            raw_key = str(record.get(list(record.keys())[0], "")).strip()
+            if not raw_key or raw_key.lower() == "nan":
+                continue
+
+            clean_name = re.sub(r'\s\(\d+\)$', '', raw_key).strip().upper()
+            index[clean_name] = self._record_to_excel_row_data(record)
+
+        return index
 
     def _record_to_excel_row_data(self, record: Dict) -> ExcelRowData:
         """
@@ -144,14 +165,14 @@ class ExcelReader:
             app=get_field(['app', 'aplicación', 'application'], ""),
             type=get_field(['type', 'tipo', 'resource_type'], ""),
             verb=get_field(['verb', 'verbo', 'http_method'], "GET"),
-            scope=get_field(['scope', 'alcance', 'nivel'], ""),
+            scope=get_field(['scope', 'alcance', 'nivel', 'ambito', 'ámbito'], ""),
             functional_use=get_field(['functional_use', 'uso_funcional', 'description'], ""),
-            inputs=parse_list_field(['inputs', 'parámetros_entrada', 'entrada'], []),
-            outputs=parse_list_field(['outputs', 'parámetros_salida', 'salida'], []),
+            inputs=parse_list_field(['inputs', 'parámetros_entrada', 'entrada', 'entradas'], []),
+            outputs=parse_list_field(['outputs', 'parámetros_salida', 'salida', 'salidas'], []),
             invokes=parse_list_field(['invokes', 'invoca', 'llamadas'], []),
-            reference_tables=parse_list_field(['reference_tables', 'tablas_referencia'], []),
-            source_document=get_field(['source_document', 'documento_origen'], ""),
-            doc_version=get_field(['doc_version', 'versión', 'version'], "1.0.0"),
+            reference_tables=parse_list_field(['reference_tables', 'tablas_referencia', 'tablas_referenciales'], []),
+            source_document=get_field(['source_document', 'documento_origen', 'documento_origen | version_doc'], ""),
+            doc_version=get_field(['doc_version', 'versión', 'version', 'version_doc'], "1.0.0"),
             reliability=get_field(['reliability', 'confiabilidad', 'fiabilidad'], "Media")
         )
 
