@@ -7,7 +7,7 @@ from app.infrastructure.storage.excelReader import ExcelReader
 DICTIONARY_COLUMNS = [
     "servicio", "app", "tipo", "verbo", "ambito", "uso_funcional",
     "entradas", "salidas", "invoca", "tablas_referenciales",
-    "documento_origen", "version_doc", "fiabilidad"
+    "documento_origen | version", "fiabilidad"
 ]
 
 
@@ -29,6 +29,8 @@ class ExcelWriter:
 
         upserted = 0
         for service in services:
+            if service.consolidated_status == "Desechado":
+                continue
             if not service.perimeter_iterations:
                 continue
             if any(it.conflicts for it in service.perimeter_iterations):
@@ -75,6 +77,17 @@ class ExcelWriter:
         return existing
 
     @staticmethod
+    def _format_document_version(source_document: str, doc_version: str) -> str:
+        """Combina documento de origen y versión en el formato de columna única
+        del Diccionario, p.ej. 'AF_Solicitud....docx | v2.0'."""
+        if not source_document:
+            return ""
+        if not doc_version:
+            return source_document
+        version_label = doc_version if doc_version.lower().startswith("v") else f"v{doc_version}"
+        return f"{source_document} | {version_label}"
+
+    @staticmethod
     def _row_from_data(service_name: str, data: ExcelRowData) -> dict:
         return {
             "servicio": service_name,
@@ -87,7 +100,6 @@ class ExcelWriter:
             "salidas": ";".join(data.outputs),
             "invoca": ";".join(data.invokes),
             "tablas_referenciales": ";".join(data.reference_tables),
-            "documento_origen": data.source_document,
-            "version_doc": data.doc_version,
+            "documento_origen | version": ExcelWriter._format_document_version(data.source_document, data.doc_version),
             "fiabilidad": data.reliability
         }

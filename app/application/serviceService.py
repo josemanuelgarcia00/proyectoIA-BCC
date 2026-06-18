@@ -1,6 +1,7 @@
 from app.infrastructure.persistence.serviceRepository import MongoRepository
 from app.application.conflictResolverService import ConflictResolver
 from app.infrastructure.storage.excelWriter import ExcelWriter
+from app.domain.service import ServiceEntity
 
 class ServiceService:
     def __init__(self):
@@ -32,6 +33,35 @@ class ServiceService:
         Estos irían al diccionario final.
         """
         return self.repo.get_resolved_services()
+
+    def get_full_dictionary(self):
+        """
+        Devuelve TODO el contenido de la hoja Diccionario del Excel de origen, no
+        solo los servicios que además aparecen en la hoja Perímetro actual. Para
+        cada servicio del Diccionario: si tiene actividad en el Perímetro se usa
+        su entidad en memoria (para reflejar revisiones en curso); si no, se
+        construye una entrada de solo lectura a partir de la fila del Diccionario.
+        """
+        dictionary_rows = self.repo.get_dictionary_rows()
+        catalog_by_name = {s.name: s for s in self.repo.get_all()}
+
+        entities = []
+        for name, row_data in dictionary_rows.items():
+            service = catalog_by_name.get(name)
+            if service:
+                entities.append(service)
+                continue
+
+            entities.append(ServiceEntity(
+                name=name,
+                exists_in_dictionary="Si",
+                consolidated_status="Aceptado",
+                winning_data=row_data,
+                perimeter_iterations=[],
+                closed=True
+            ))
+
+        return entities
 
     def refresh_from_source(self):
         """

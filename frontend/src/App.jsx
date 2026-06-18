@@ -11,6 +11,7 @@ export default function App() {
 
   // Guarda lo que el usuario escriba en el buscador
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortAlpha, setSortAlpha] = useState(false);
   const [toast, setToast] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -19,19 +20,24 @@ export default function App() {
     setTimeout(() => setToast(null), 5000);
   };
 
-  // Pendiente de revisión: tiene conflictos sin resolver, o es un servicio nuevo
-  // (no está en el Diccionario) que todavía no se ha aceptado ni rechazado.
-  const isPending = (s) => !s.closed && (s.requires_attention || !s.is_in_dictionary);
+  // Pendiente de revisión: tiene conflictos sin resolver, es un servicio nuevo
+  // (no está en el Diccionario), o ya se resolvieron todas sus iteraciones pero
+  // todavía no se ha aceptado ni rechazado (sigue sin estar "closed"). Este último
+  // caso es importante: al resolver el último conflicto, requires_attention pasa
+  // a false, pero el servicio debe seguir visible hasta que el usuario confirme.
+  const hasResolvedIterations = (s) => (s.perimeter_iterations || []).some(it => it.resolution != null);
+  const isPending = (s) => !s.closed && (s.requires_attention || !s.is_in_dictionary || hasResolvedIterations(s));
 
   const loadConflicts = () => {
     setLoading(true);
     setView('conflicts');
     setSearchTerm(''); // Limpiamos el buscador al cambiar de pestaña
+    setSortAlpha(false);
+    setSelectedService(null); // Evita renderizar el detalle anterior con la vista nueva mientras carga
 
-    // Recarga desde el Excel de origen y luego trae el catálogo actualizado
-    fetch('/api/v1/services/refresh', { method: 'POST' })
-      .catch(() => {})
-      .then(() => fetch('/api/v1/services/'))
+    // Trae el catálogo actual en memoria (sin recargar desde el Excel de origen,
+    // para no perder revisiones ya aplicadas que aún no se han guardado)
+    fetch('/api/v1/services/')
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -53,16 +59,18 @@ export default function App() {
     setLoading(true);
     setView('dictionary');
     setSearchTerm(''); // Limpiamos el buscador al cambiar de pestaña
+    setSortAlpha(false);
+    setSelectedService(null); // Evita renderizar el detalle anterior con la vista nueva mientras carga
 
-    fetch('/api/v1/services/')
+    // Trae TODO el contenido de la hoja Diccionario del Excel, no solo los
+    // servicios que además aparecen en la hoja Perímetro actual
+    fetch('/api/v1/services/dictionary/full')
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
       .then(data => {
-        // Diccionario completo: servicios que ya forman parte del Diccionario final
-        const inDictionary = data.filter(s => s.is_in_dictionary);
-        setServices(inDictionary);
+        setServices(data);
         setSelectedService(null);
         setLoading(false);
       })
@@ -75,8 +83,11 @@ export default function App() {
   const saveToExcel = () => {
     setSaving(true);
     fetch('/api/v1/services/save-to-excel', { method: 'POST' })
-      .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      .then(async r => {
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error(err.detail || `HTTP ${r.status}`);
+        }
         return r.json();
       })
       .then(data => {
@@ -94,10 +105,11 @@ export default function App() {
     loadConflicts();
   }, []);
 
-  // Filtra por nombre de servicio según el término de búsqueda
-  const filteredServices = services.filter(service =>
-    service.service_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filtra por nombre de servicio según el término de búsqueda, y opcionalmente
+  // ordena alfabéticamente (solo disponible en el Diccionario completo)
+  const filteredServices = services
+    .filter(service => service.service_name.toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort((a, b) => sortAlpha ? a.service_name.localeCompare(b.service_name) : 0);
 
   return (
     <div className="container">
@@ -132,7 +144,7 @@ export default function App() {
               </span>
             </h2>
 
-            <div style={{ marginBottom: '16px' }}>
+            <div style={{ marginBottom: '16px', display: 'flex', gap: '10px' }}>
               <input
                 type="text"
                 className="search-input"
@@ -140,6 +152,15 @@ export default function App() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
+              {view === 'dictionary' && (
+                <button
+                  className="btn-quiet"
+                  style={{ flex: 'none' }}
+                  onClick={() => setSortAlpha(prev => !prev)}
+                >
+                  {sortAlpha ? 'Orden original' : 'Ordenar A-Z'}
+                </button>
+              )}
             </div>
 
             {filteredServices.length === 0 ? (
@@ -158,7 +179,7 @@ export default function App() {
                     {service.is_in_dictionary
                       ? <span className="stamp stamp-moss">En diccionario</span>
                       : <span className="stamp stamp-amber">Nuevo</span>}
-                    {service.perimeter_iterations?.length > 0 && (
+                    {view !== 'dictionary' && service.perimeter_iterations?.length > 0 && (
                       <span className="mono" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                         {service.perimeter_iterations.length} iteraciones
                       </span>

@@ -10,7 +10,6 @@ const STATUS_STAMP = {
 
 export default function IterationReview({ service, onServiceClosed }) {
   const [localService, setLocalService] = useState(service);
-  const [hiddenIterations, setHiddenIterations] = useState(new Set());
   const [toast, setToast] = useState(null);
   const [resolvingId, setResolvingId] = useState(null);
   const [previewData, setPreviewData] = useState(null);
@@ -22,7 +21,6 @@ export default function IterationReview({ service, onServiceClosed }) {
   // Cuando se selecciona otro servicio en la lista, reiniciamos el estado local
   useEffect(() => {
     setLocalService(service);
-    setHiddenIterations(new Set());
     setToast(null);
     setPreviewData(null);
     setObservations(service?.observations || '');
@@ -32,10 +30,10 @@ export default function IterationReview({ service, onServiceClosed }) {
   // (la primera con conflictos sin revisar): al pasar a la siguiente, se recarga.
   useEffect(() => {
     const pending = (localService?.perimeter_iterations || []).filter(
-      it => it.conflicts && it.conflicts.length > 0 && !hiddenIterations.has(it.iteration_id)
+      it => it.conflicts && it.conflicts.length > 0
     );
     setIterationObservations(pending[0]?.observations || '');
-  }, [localService, hiddenIterations]);
+  }, [localService]);
 
   if (!localService || !localService.perimeter_iterations) {
     return <div className="empty">Cargando detalles del servicio...</div>;
@@ -71,7 +69,6 @@ export default function IterationReview({ service, onServiceClosed }) {
 
       const updated = await res.json();
       setLocalService(updated);
-      setHiddenIterations(prev => new Set(prev).add(iterationId));
       showToast(`✅ Iteración ${iterationId} revisada`);
     } catch (e) {
       showToast(`❌ ${e.message}`);
@@ -95,11 +92,6 @@ export default function IterationReview({ service, onServiceClosed }) {
 
       const updated = await res.json();
       setLocalService(updated);
-      setHiddenIterations(prev => {
-        const next = new Set(prev);
-        next.delete(iterationId);
-        return next;
-      });
       showToast(`↩ Iteración ${iterationId} restaurada`);
     } catch (e) {
       showToast(`❌ ${e.message}`);
@@ -123,7 +115,6 @@ export default function IterationReview({ service, onServiceClosed }) {
 
       const updated = await res.json();
       setLocalService(updated);
-      setHiddenIterations(new Set());
       showToast(`↺ Conflictos de ${localService.service_name} reiniciados`);
     } catch (e) {
       showToast(`❌ ${e.message}`);
@@ -259,7 +250,7 @@ export default function IterationReview({ service, onServiceClosed }) {
 
   // Solo interesa mostrar iteraciones con conflictos pendientes de revisar
   const visibleIterations = localService.perimeter_iterations.filter(
-    it => it.conflicts && it.conflicts.length > 0 && !hiddenIterations.has(it.iteration_id)
+    it => it.conflicts && it.conflicts.length > 0
   );
 
   // Última iteración = dato consolidado que pasaría al Diccionario una vez revisado todo
@@ -273,9 +264,11 @@ export default function IterationReview({ service, onServiceClosed }) {
   // Servicio nuevo: no existe en el Diccionario Maestro, solo se puede aceptar o rechazar
   const isNewService = !localService.is_in_dictionary;
 
-  // Iteraciones ya revisadas (ocultas), para poder volver atrás una a una
+  // Iteraciones ya revisadas (con resolución persistida), para poder volver atrás
+  // una a una. A diferencia de antes, esto no depende de un estado local que se
+  // reinicia al salir y volver a entrar al servicio: se basa en el dato guardado.
   const resolvedIterations = localService.perimeter_iterations.filter(
-    it => hiddenIterations.has(it.iteration_id)
+    it => it.resolution != null
   );
 
   // Solo se muestra una iteración con conflictos a la vez (la siguiente aparece
@@ -327,22 +320,22 @@ export default function IterationReview({ service, onServiceClosed }) {
       </h3>
 
       <div className="data-grid">
-        <div><span className="data-field-label">App</span><span className="mono">{finalData.app || 'N/A'}</span></div>
-        <div><span className="data-field-label">Tipo</span><span className="mono">{finalData.type || 'N/A'}</span></div>
-        <div><span className="data-field-label">Verbo</span><span className="mono">{finalData.verb || 'N/A'}</span></div>
-        <div><span className="data-field-label">Ámbito</span>{finalData.scope || 'N/A'}</div>
-        <div><span className="data-field-label">Fiabilidad</span>{finalData.reliability || 'N/A'}</div>
-        <div><span className="data-field-label">Documento</span>{finalData.source_document || 'N/A'} <span className="mono">v{finalData.doc_version || '-'}</span></div>
+        <div><span className="data-field-label">App</span><span className="mono">{finalData?.app || 'N/A'}</span></div>
+        <div><span className="data-field-label">Tipo</span><span className="mono">{finalData?.type || 'N/A'}</span></div>
+        <div><span className="data-field-label">Verbo</span><span className="mono">{finalData?.verb || 'N/A'}</span></div>
+        <div><span className="data-field-label">Ámbito</span>{finalData?.scope || 'N/A'}</div>
+        <div><span className="data-field-label">Fiabilidad</span>{finalData?.reliability || 'N/A'}</div>
+        <div><span className="data-field-label">Documento</span>{finalData?.source_document || 'N/A'} <span className="mono">v{finalData?.doc_version || '-'}</span></div>
 
         <div className="data-field-block">
           <span className="data-field-label">Uso funcional</span>
-          {finalData.functional_use || 'N/A'}
+          {finalData?.functional_use || 'N/A'}
         </div>
 
-        <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(finalData.inputs)}</span></div>
-        <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(finalData.outputs)}</span></div>
-        <div className="wide"><span className="data-field-label">Invoca</span><span className="mono">{renderList(finalData.invokes)}</span></div>
-        <div className="wide"><span className="data-field-label">Tablas referenciales</span><span className="mono">{renderList(finalData.reference_tables)}</span></div>
+        <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(finalData?.inputs)}</span></div>
+        <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(finalData?.outputs)}</span></div>
+        <div className="wide"><span className="data-field-label">Invoca</span><span className="mono">{renderList(finalData?.invokes)}</span></div>
+        <div className="wide"><span className="data-field-label">Tablas referenciales</span><span className="mono">{renderList(finalData?.reference_tables)}</span></div>
       </div>
 
       <div className="buttons" style={{ marginTop: '20px' }}>
@@ -379,22 +372,22 @@ export default function IterationReview({ service, onServiceClosed }) {
       <h3>Datos del servicio</h3>
 
       <div className="data-grid">
-        <div><span className="data-field-label">App</span><span className="mono">{finalData.app || 'N/A'}</span></div>
-        <div><span className="data-field-label">Tipo</span><span className="mono">{finalData.type || 'N/A'}</span></div>
-        <div><span className="data-field-label">Verbo</span><span className="mono">{finalData.verb || 'N/A'}</span></div>
-        <div><span className="data-field-label">Ámbito</span>{finalData.scope || 'N/A'}</div>
-        <div><span className="data-field-label">Fiabilidad</span>{finalData.reliability || 'N/A'}</div>
-        <div><span className="data-field-label">Documento</span>{finalData.source_document || 'N/A'} <span className="mono">v{finalData.doc_version || '-'}</span></div>
+        <div><span className="data-field-label">App</span><span className="mono">{finalData?.app || 'N/A'}</span></div>
+        <div><span className="data-field-label">Tipo</span><span className="mono">{finalData?.type || 'N/A'}</span></div>
+        <div><span className="data-field-label">Verbo</span><span className="mono">{finalData?.verb || 'N/A'}</span></div>
+        <div><span className="data-field-label">Ámbito</span>{finalData?.scope || 'N/A'}</div>
+        <div><span className="data-field-label">Fiabilidad</span>{finalData?.reliability || 'N/A'}</div>
+        <div><span className="data-field-label">Documento</span>{finalData?.source_document || 'N/A'} <span className="mono">v{finalData?.doc_version || '-'}</span></div>
 
         <div className="data-field-block">
           <span className="data-field-label">Uso funcional</span>
-          {finalData.functional_use || 'N/A'}
+          {finalData?.functional_use || 'N/A'}
         </div>
 
-        <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(finalData.inputs)}</span></div>
-        <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(finalData.outputs)}</span></div>
-        <div className="wide"><span className="data-field-label">Invoca</span><span className="mono">{renderList(finalData.invokes)}</span></div>
-        <div className="wide"><span className="data-field-label">Tablas referenciales</span><span className="mono">{renderList(finalData.reference_tables)}</span></div>
+        <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(finalData?.inputs)}</span></div>
+        <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(finalData?.outputs)}</span></div>
+        <div className="wide"><span className="data-field-label">Invoca</span><span className="mono">{renderList(finalData?.invokes)}</span></div>
+        <div className="wide"><span className="data-field-label">Tablas referenciales</span><span className="mono">{renderList(finalData?.reference_tables)}</span></div>
       </div>
 
       <div className="buttons" style={{ marginTop: '20px' }}>

@@ -18,25 +18,27 @@ class ExcelReader:
         Lee el Excel, limpia los valores nulos y normaliza los nombres de las columnas.
         Retorna dos listas de diccionarios (Diccionario y Perímetro).
         """
-        # Leemos el archivo
-        xls = pd.ExcelFile(self.file_path)
-        
-        # Validamos que las hojas existan
-        if 'Diccionario' not in xls.sheet_names or 'Perímetro' not in xls.sheet_names:
-            raise ValueError("El Excel debe contener las hojas 'Diccionario' y 'Perímetro'")
+        # Leemos el archivo. Usamos un context manager para cerrar el fichero en
+        # cuanto terminamos de leerlo (no dejar el handle abierto más de lo
+        # necesario evita conflictos si alguien tiene el Excel abierto a la vez
+        # en la aplicación de escritorio).
+        with pd.ExcelFile(self.file_path) as xls:
+            # Validamos que las hojas existan
+            if 'Diccionario' not in xls.sheet_names or 'Perímetro' not in xls.sheet_names:
+                raise ValueError("El Excel debe contener las hojas 'Diccionario' y 'Perímetro'")
 
-        # Leemos hojas
-        dic_df = pd.read_excel(xls, sheet_name='Diccionario')
-        per_df = pd.read_excel(xls, sheet_name='Perímetro')
-        
+            # Leemos hojas
+            dic_df = pd.read_excel(xls, sheet_name='Diccionario')
+            per_df = pd.read_excel(xls, sheet_name='Perímetro')
+
         # Limpieza: Eliminamos espacios en blanco en nombres de columnas
         dic_df.columns = dic_df.columns.str.strip()
         per_df.columns = per_df.columns.str.strip()
-        
+
         # Limpieza: Convertimos NaNs a strings vacíos para que el dominio no sufra
         dic_df = dic_df.fillna("")
         per_df = per_df.fillna("")
-        
+
         # Convertimos a formato lista de diccionarios
         return dic_df.to_dict('records'), per_df.to_dict('records')
 
@@ -137,6 +139,27 @@ class ExcelReader:
 
         return index
 
+    # Columna única que representa el par documento de origen + versión, p.ej.
+    # "AF_Solicitud - Datos del contrato - v1.2.6.docx | v2.0". Separador entre
+    # nombre de documento y versión: " | ", " - " o solo espacios, todos con "v"
+    # delante del número de versión (caso real observado en el Diccionario).
+    DOCUMENT_VERSION_PATTERN = re.compile(r'^(.*\S)\s*[-(|]?\s*[vV](\d+(?:\.\d+)*)\)?\s*$')
+
+    @classmethod
+    def _split_document_version(cls, value: str) -> Tuple[str, str]:
+        """Separa un valor combinado 'documento + versión' en sus dos partes.
+        Si no se reconoce el patrón (p.ej. valores ya fusionados de varias
+        iteraciones sin versión al final), se devuelve el valor entero como
+        documento y la versión vacía."""
+        if not value:
+            return "", ""
+
+        match = cls.DOCUMENT_VERSION_PATTERN.match(value.strip())
+        if not match:
+            return value.strip(), ""
+
+        return match.group(1).strip(" -|"), match.group(2)
+
     def _record_to_excel_row_data(self, record: Dict) -> ExcelRowData:
         """
         Convierte un registro del Excel en un objeto ExcelRowData.
@@ -144,7 +167,7 @@ class ExcelReader:
         """
         # Mapeo flexible de columnas (case-insensitive)
         columns_lower = {k.lower().strip(): v for k, v in record.items()}
-        
+
         def get_field(names_list, default=""):
             """Obtiene un campo buscando en múltiples nombres posibles"""
             for name in names_list:
@@ -152,7 +175,7 @@ class ExcelReader:
                     value = columns_lower[name.lower().strip()]
                     return str(value).strip() if value else default
             return default
-        
+
         def parse_list_field(names_list, default=None):
             """Parsea un campo de lista (separado por comas o ;)"""
             value = get_field(names_list, "")
@@ -161,7 +184,18 @@ class ExcelReader:
             # Dividir por comas o puntos y coma
             items = re.split(r'[,;]', value)
             return [item.strip() for item in items if item.strip()]
-        
+
+        # El Diccionario ahora representa documento de origen y versión como un
+        # único par en una sola columna ("documento_origen | version"). Seguimos
+        # aceptando las dos columnas separadas como fallback por si el Excel
+        # todavía no se migró.
+        combined_doc = get_field(['documento_origen | version', 'documento_origen|version', 'source_document'], "")
+        source_document, doc_version = self._split_document_version(combined_doc)
+        if not source_document:
+            source_document = get_field(['documento_origen'], "")
+        if not doc_version:
+            doc_version = get_field(['doc_version', 'versión', 'version', 'version_doc'], "1.0.0")
+
         return ExcelRowData(
             app=get_field(['app', 'aplicación', 'application'], ""),
             type=get_field(['type', 'tipo', 'resource_type'], ""),
@@ -172,8 +206,8 @@ class ExcelReader:
             outputs=parse_list_field(['outputs', 'parámetros_salida', 'salida', 'salidas'], []),
             invokes=parse_list_field(['invokes', 'invoca', 'llamadas'], []),
             reference_tables=parse_list_field(['reference_tables', 'tablas_referencia', 'tablas_referenciales'], []),
-            source_document=get_field(['source_document', 'documento_origen', 'documento_origen | version_doc'], ""),
-            doc_version=get_field(['doc_version', 'versión', 'version', 'version_doc'], "1.0.0"),
+            source_document=source_document,
+            doc_version=doc_version,
             reliability=get_field(['reliability', 'confiabilidad', 'fiabilidad'], "Media")
         )
 

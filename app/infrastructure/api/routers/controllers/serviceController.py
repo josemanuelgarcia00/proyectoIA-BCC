@@ -44,6 +44,11 @@ def save_to_excel():
         service = ServiceService()
         result = service.save_to_excel()
         return result
+    except PermissionError:
+        raise HTTPException(
+            status_code=409,
+            detail="No se pudo guardar: el archivo Excel está abierto en otro programa (p. ej. Excel). Cierra el archivo y vuelve a intentarlo."
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -76,6 +81,25 @@ def get_resolved_services():
         
         response = [ServiceResponseDTO.from_domain(entity) for entity in resolved_entities]
         return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+
+@router.get(
+    "/dictionary/full",
+    response_model=List[ServiceResponseDTO],
+    summary="Obtener TODO el contenido de la hoja Diccionario del Excel"
+)
+def get_full_dictionary():
+    """
+    Obtiene el contenido completo de la hoja Diccionario, incluyendo servicios
+    que no tienen actividad en la hoja Perímetro actual (y que por tanto no
+    aparecen en el catálogo general)
+    """
+    try:
+        service = ServiceService()
+        entities = service.get_full_dictionary()
+        return [ServiceResponseDTO.from_domain(e) for e in entities]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 

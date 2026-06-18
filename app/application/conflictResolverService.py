@@ -90,7 +90,16 @@ class ConflictResolver:
 
     @staticmethod
     def _compute_status(service: ServiceEntity) -> str:
+        """
+        "Aceptado"/"Unificado" solo se asignan cuando el servicio está realmente
+        cerrado (closed=True, tras "Aceptar cambios" en accept_and_close). Si ya
+        no quedan conflictos pero el usuario todavía no ha confirmado el cierre,
+        el servicio sigue "En revision": de lo contrario la etiqueta anunciaría
+        una decisión que el usuario aún no ha tomado.
+        """
         if any(it.conflicts for it in service.perimeter_iterations):
+            return "En revision"
+        if not service.closed:
             return "En revision"
         if any(it.resolution == "unify" for it in service.perimeter_iterations):
             return "Unificado"
