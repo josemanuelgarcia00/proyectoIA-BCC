@@ -144,10 +144,10 @@ class ConflictResolver:
     @staticmethod
     def preview_final_merge(service: ServiceEntity) -> Optional[ExcelRowData]:
         """
-        Calcula (sin aplicar nada) cómo quedaría el dato final para el Diccionario.
-        La cascada de uniones ya incorpora el Diccionario maestro desde la 1ª
-        iteración, así que el resultado es simplemente el de la última iteración
-        ya revisada (no se vuelve a unir con el maestro para no duplicar texto).
+        Calcula (sin aplicar nada) cómo quedaría el dato final para el Diccionario:
+        une la última iteración ya revisada con el dato maestro actual del
+        Diccionario (winning_data), igual que hace "Unificar" en cada conflicto,
+        para garantizar que nada de lo ya existente en el Diccionario se pierde.
         Devuelve None si todavía quedan conflictos pendientes o no hay iteraciones.
         """
         if any(it.conflicts for it in service.perimeter_iterations):
@@ -155,13 +155,25 @@ class ConflictResolver:
         if not service.perimeter_iterations:
             return None
 
-        return service.perimeter_iterations[-1].data.model_copy(deep=True)
+        final_data = service.perimeter_iterations[-1].data
+        master_data = service.winning_data
+
+        if master_data is None:
+            return final_data.model_copy(deep=True)
+
+        merged_fields = {
+            field: ConflictResolver._merge_values(
+                getattr(master_data, field), getattr(final_data, field), field
+            )
+            for field in ExcelRowData.model_fields
+        }
+        return ExcelRowData(**merged_fields)
 
     @staticmethod
     def accept_and_close(service: ServiceEntity) -> Optional[ServiceEntity]:
         """
-        Cierra el servicio: fija el resultado final de la revisión (última iteración,
-        ya unificada en cascada con el Diccionario) como dato maestro definitivo.
+        Cierra el servicio: une el resultado final de la revisión con el dato
+        maestro del Diccionario y lo fija como definitivo.
         Devuelve None si todavía quedan conflictos pendientes.
         """
         merged = ConflictResolver.preview_final_merge(service)

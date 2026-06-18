@@ -318,3 +318,26 @@ def update_observations(item_id: str, payload: ObservationsRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put(
+    "/{item_id}/iterations/{iteration_id}/observations",
+    response_model=ServiceResponseDTO,
+    summary="Guardar observaciones de una iteración"
+)
+def update_iteration_observations(item_id: str, iteration_id: int, payload: ObservationsRequest):
+    """Guarda notas libres del usuario asociadas a una iteración concreta"""
+    try:
+        service = ServiceService()
+        domain_entity = service.update_iteration_observations(
+            item_id.upper(), iteration_id, payload.observations
+        )
+
+        if not domain_entity:
+            raise HTTPException(status_code=404, detail="Servicio o iteración no encontrada")
+
+        return ServiceResponseDTO.from_domain(domain_entity)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

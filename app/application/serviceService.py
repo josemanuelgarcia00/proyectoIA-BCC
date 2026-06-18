@@ -129,6 +129,25 @@ class ServiceService:
         service.observations = observations
         return service
 
+    def update_iteration_observations(self, item_id: str, iteration_id: int, observations: str):
+        """
+        Guarda observaciones libres del usuario asociadas a una iteración concreta.
+        Devuelve None si no se encontró el servicio o la iteración.
+        """
+        service = self.repo.get_by_id(item_id)
+        if not service:
+            return None
+
+        iteration = next(
+            (it for it in service.perimeter_iterations if it.iteration_id == iteration_id),
+            None
+        )
+        if not iteration:
+            return None
+
+        iteration.observations = observations
+        return service
+
     def save_to_excel(self):
         """
         Si ya no quedan conflictos pendientes en ningún servicio, vuelca el resultado

@@ -32,6 +32,7 @@ class PerimeterIterationResponseDTO(BaseModel):
     data: ExcelRowDataResponseDTO
     conflicts: List[CellConflictResponseDTO]
     resolution: Optional[str] = None
+    observations: str = ""
 
 
 class ServiceResponseDTO(BaseModel):
@@ -77,7 +78,8 @@ class ServiceResponseDTO(BaseModel):
                 iteration_id=it.iteration_id,
                 data=data_dto,
                 conflicts=conflicts_dto,
-                resolution=it.resolution
+                resolution=it.resolution,
+                observations=it.observations
             ))
 
         # --- Mapeo de los datos del diccionario si existen ---

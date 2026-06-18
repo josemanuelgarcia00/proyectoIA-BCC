@@ -37,6 +37,7 @@ class PerimeterIteration(BaseModel):
     # Snapshot del estado original (antes de cualquier resolución), para poder volver atrás
     original_data: Optional[ExcelRowData] = None
     original_conflicts: List[CellConflict] = []
+    observations: str = ""  # Notas libres del usuario, propias de esta iteración
 
 
 class ServiceEntity(BaseModel):

@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from 'react';
 
+const STATUS_STAMP = {
+  'Aceptado': 'stamp-moss',
+  'Unificado': 'stamp-moss',
+  'Cerrado': 'stamp-moss',
+  'Desechado': 'stamp-rust',
+  'En revision': 'stamp-amber'
+};
+
 export default function IterationReview({ service, onServiceClosed }) {
   const [localService, setLocalService] = useState(service);
   const [hiddenIterations, setHiddenIterations] = useState(new Set());
@@ -8,6 +16,8 @@ export default function IterationReview({ service, onServiceClosed }) {
   const [previewData, setPreviewData] = useState(null);
   const [observations, setObservations] = useState(service?.observations || '');
   const [savingObservations, setSavingObservations] = useState(false);
+  const [iterationObservations, setIterationObservations] = useState('');
+  const [savingIterationObservations, setSavingIterationObservations] = useState(false);
 
   // Cuando se selecciona otro servicio en la lista, reiniciamos el estado local
   useEffect(() => {
@@ -17,6 +27,15 @@ export default function IterationReview({ service, onServiceClosed }) {
     setPreviewData(null);
     setObservations(service?.observations || '');
   }, [service]);
+
+  // Sincroniza el cuadro de observaciones con la iteración pendiente actual
+  // (la primera con conflictos sin revisar): al pasar a la siguiente, se recarga.
+  useEffect(() => {
+    const pending = (localService?.perimeter_iterations || []).filter(
+      it => it.conflicts && it.conflicts.length > 0 && !hiddenIterations.has(it.iteration_id)
+    );
+    setIterationObservations(pending[0]?.observations || '');
+  }, [localService, hiddenIterations]);
 
   if (!localService || !localService.perimeter_iterations) {
     return <div className="empty">Cargando detalles del servicio...</div>;
@@ -211,6 +230,33 @@ export default function IterationReview({ service, onServiceClosed }) {
     }
   };
 
+  const saveIterationObservations = async (iterationId) => {
+    setSavingIterationObservations(true);
+    try {
+      const res = await fetch(
+        `/api/v1/services/${encodeURIComponent(localService.service_name)}/iterations/${iterationId}/observations`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ observations: iterationObservations })
+        }
+      );
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'No se pudieron guardar las observaciones');
+      }
+
+      const updated = await res.json();
+      setLocalService(updated);
+      showToast('📝 Observaciones de la iteración guardadas');
+    } catch (e) {
+      showToast(`❌ ${e.message}`);
+    } finally {
+      setSavingIterationObservations(false);
+    }
+  };
+
   // Solo interesa mostrar iteraciones con conflictos pendientes de revisar
   const visibleIterations = localService.perimeter_iterations.filter(
     it => it.conflicts && it.conflicts.length > 0 && !hiddenIterations.has(it.iteration_id)
@@ -224,86 +270,79 @@ export default function IterationReview({ service, onServiceClosed }) {
   // Cuando ya no quedan conflictos pendientes, mostramos diccionario y resultado final lado a lado
   const allResolved = localService.perimeter_iterations.length > 0 && visibleIterations.length === 0;
 
+  // Servicio nuevo: no existe en el Diccionario Maestro, solo se puede aceptar o rechazar
+  const isNewService = !localService.is_in_dictionary;
+
   // Iteraciones ya revisadas (ocultas), para poder volver atrás una a una
   const resolvedIterations = localService.perimeter_iterations.filter(
     it => hiddenIterations.has(it.iteration_id)
   );
 
-  const resolutionLabel = (resolution) => {
-    if (resolution === 'unify') return 'Unificada';
-    if (resolution === 'reject') return 'Cambios rechazados';
-    return 'Revisada';
+  // Solo se muestra una iteración con conflictos a la vez (la siguiente aparece
+  // al resolver la actual), manteniendo siempre su iteration_id original.
+  const currentIteration = visibleIterations[0] || null;
+  const totalConflictIterations = visibleIterations.length + resolvedIterations.length;
+  const currentPosition = resolvedIterations.length + 1;
+
+  const resolutionStamp = (resolution) => {
+    if (resolution === 'unify') return { label: 'Unificada', cls: 'stamp-moss' };
+    if (resolution === 'reject') return { label: 'Rechazada', cls: 'stamp-rust' };
+    return { label: 'Revisada', cls: 'stamp-ink' };
   };
 
-  const dictionaryBox = !localService.is_in_dictionary ? (
-    <div style={{
-        background: '#fff3cd', border: '2px dashed #ffeeba', color: '#856404',
-        padding: '24px', borderRadius: '6px', textAlign: 'center',
-        fontSize: '15px', fontWeight: 'bold'
-    }}>
-      🚨 Este servicio NO existe en el Diccionario Maestro.<br/>
-      <span style={{fontWeight: 'normal', fontSize: '13px', marginTop: '8px', display: 'block'}}>
-        Es un servicio de nueva creación detectado en el perímetro.
-      </span>
-    </div>
-  ) : (
-    <div style={{
-        background: 'white', border: '1px solid var(--primary)', borderTop: '4px solid var(--primary-dark)',
-        padding: '20px', borderRadius: '6px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-    }}>
-      <h3 style={{ color: 'var(--primary-dark)', marginBottom: '20px', fontSize: '14px', textTransform: 'uppercase', fontWeight: '700' }}>
-        📚 Datos del Diccionario (Maestro)
-      </h3>
+  const statusStampClass = STATUS_STAMP[localService.status] || 'stamp-ink';
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', fontSize: '13px' }}>
-        <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>App:</strong> {localService.dictionary_data?.app || 'N/A'}</div>
-        <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Tipo:</strong> {localService.dictionary_data?.type || 'N/A'}</div>
-        <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Verbo:</strong> {localService.dictionary_data?.verb || 'N/A'}</div>
-        <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Ámbito:</strong> {localService.dictionary_data?.scope || 'N/A'}</div>
-        <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Fiabilidad:</strong> {localService.dictionary_data?.reliability || 'N/A'}</div>
-        <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Documento:</strong> {localService.dictionary_data?.source_document || 'N/A'} (v{localService.dictionary_data?.doc_version || '-'})</div>
+  // Solo se usa cuando el servicio SÍ existe en el Diccionario (si es nuevo, se
+  // muestra en su lugar el aviso de una sola línea más abajo en el render)
+  const dictionaryBox = (
+    <div className="data-card accent-primary">
+      <h3>Diccionario maestro</h3>
 
-        <div style={{ gridColumn: '1 / -1', background: '#f8f9fa', padding: '12px', borderRadius: '4px', marginTop: '8px', border: '1px solid var(--border)' }}>
-            <strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase', marginBottom: '4px'}}>Uso Funcional:</strong>
-            {localService.dictionary_data?.functional_use || 'N/A'}
+      <div className="data-grid">
+        <div><span className="data-field-label">App</span><span className="mono">{localService.dictionary_data?.app || 'N/A'}</span></div>
+        <div><span className="data-field-label">Tipo</span><span className="mono">{localService.dictionary_data?.type || 'N/A'}</span></div>
+        <div><span className="data-field-label">Verbo</span><span className="mono">{localService.dictionary_data?.verb || 'N/A'}</span></div>
+        <div><span className="data-field-label">Ámbito</span>{localService.dictionary_data?.scope || 'N/A'}</div>
+        <div><span className="data-field-label">Fiabilidad</span>{localService.dictionary_data?.reliability || 'N/A'}</div>
+        <div><span className="data-field-label">Documento</span>{localService.dictionary_data?.source_document || 'N/A'} <span className="mono">v{localService.dictionary_data?.doc_version || '-'}</span></div>
+
+        <div className="data-field-block">
+          <span className="data-field-label">Uso funcional</span>
+          {localService.dictionary_data?.functional_use || 'N/A'}
         </div>
 
-        <div style={{ gridColumn: '1 / -1' }}><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Entradas:</strong> {renderList(localService.dictionary_data?.inputs)}</div>
-        <div style={{ gridColumn: '1 / -1' }}><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Salidas:</strong> {renderList(localService.dictionary_data?.outputs)}</div>
-        <div style={{ gridColumn: '1 / -1' }}><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Invoca:</strong> {renderList(localService.dictionary_data?.invokes)}</div>
-        <div style={{ gridColumn: '1 / -1' }}><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Tablas Referenciales:</strong> {renderList(localService.dictionary_data?.reference_tables)}</div>
+        <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(localService.dictionary_data?.inputs)}</span></div>
+        <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(localService.dictionary_data?.outputs)}</span></div>
+        <div className="wide"><span className="data-field-label">Invoca</span><span className="mono">{renderList(localService.dictionary_data?.invokes)}</span></div>
+        <div className="wide"><span className="data-field-label">Tablas referenciales</span><span className="mono">{renderList(localService.dictionary_data?.reference_tables)}</span></div>
       </div>
     </div>
   );
 
   const finalResultBox = (
-    <div style={{
-        background: 'white', border: '1px solid var(--success)', borderTop: '4px solid var(--success)',
-        padding: '20px', borderRadius: '6px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-    }}>
-      <h3 style={{ color: 'var(--success)', marginBottom: '20px', fontSize: '14px', textTransform: 'uppercase', fontWeight: '700' }}>
-        ✅ Revisión Completada — Resultado para el Diccionario
+    <div className="data-card accent-moss">
+      <h3>
+        Resultado para el diccionario
+        <span className="stamp stamp-moss">Listo para cerrar</span>
       </h3>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', fontSize: '13px' }}>
-        <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>App:</strong> {finalData.app || 'N/A'}</div>
-        <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Tipo:</strong> {finalData.type || 'N/A'}</div>
-        <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Verbo:</strong> {finalData.verb || 'N/A'}</div>
-        <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Ámbito:</strong> {finalData.scope || 'N/A'}</div>
-        <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Fiabilidad:</strong> {finalData.reliability || 'N/A'}</div>
-        <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Documento:</strong> {finalData.source_document || 'N/A'} (v{finalData.doc_version || '-'})</div>
+      <div className="data-grid">
+        <div><span className="data-field-label">App</span><span className="mono">{finalData.app || 'N/A'}</span></div>
+        <div><span className="data-field-label">Tipo</span><span className="mono">{finalData.type || 'N/A'}</span></div>
+        <div><span className="data-field-label">Verbo</span><span className="mono">{finalData.verb || 'N/A'}</span></div>
+        <div><span className="data-field-label">Ámbito</span>{finalData.scope || 'N/A'}</div>
+        <div><span className="data-field-label">Fiabilidad</span>{finalData.reliability || 'N/A'}</div>
+        <div><span className="data-field-label">Documento</span>{finalData.source_document || 'N/A'} <span className="mono">v{finalData.doc_version || '-'}</span></div>
 
-        <div style={{ gridColumn: '1 / -1', background: '#f8f9fa', padding: '12px', borderRadius: '4px', marginTop: '8px', border: '1px solid var(--border)' }}>
-            <strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase', marginBottom: '4px'}}>Uso Funcional:</strong>
-            {finalData.functional_use || 'N/A'}
+        <div className="data-field-block">
+          <span className="data-field-label">Uso funcional</span>
+          {finalData.functional_use || 'N/A'}
         </div>
 
-        <div style={{ gridColumn: '1 / -1' }}><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Entradas:</strong> {renderList(finalData.inputs)}</div>
-        <div style={{ gridColumn: '1 / -1' }}><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Salidas:</strong> {renderList(finalData.outputs)}</div>
-        <div style={{ gridColumn: '1 / -1' }}><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Invoca:</strong> {renderList(finalData.invokes)}</div>
-        <div style={{ gridColumn: '1 / -1' }}><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Tablas Referenciales:</strong> {renderList(finalData.reference_tables)}</div>
+        <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(finalData.inputs)}</span></div>
+        <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(finalData.outputs)}</span></div>
+        <div className="wide"><span className="data-field-label">Invoca</span><span className="mono">{renderList(finalData.invokes)}</span></div>
+        <div className="wide"><span className="data-field-label">Tablas referenciales</span><span className="mono">{renderList(finalData.reference_tables)}</span></div>
       </div>
 
       <div className="buttons" style={{ marginTop: '20px' }}>
@@ -312,54 +351,92 @@ export default function IterationReview({ service, onServiceClosed }) {
           disabled={resolvingId === 'accept-close'}
           onClick={requestAcceptPreview}
         >
-          {resolvingId === 'accept-close' ? 'Calculando...' : '✅ Aceptar Cambios'}
+          {resolvingId === 'accept-close' ? 'Calculando...' : 'Aceptar cambios'}
         </button>
         <button
-          className="btn-reject"
+          className="btn-quiet"
+          style={{ flex: 1, textAlign: 'center' }}
           disabled={resolvingId === 'reset'}
           onClick={resetServiceConflicts}
         >
-          {resolvingId === 'reset' ? 'Aplicando...' : '↺ Reiniciar Conflicto'}
+          {resolvingId === 'reset' ? 'Aplicando...' : 'Reiniciar conflicto'}
         </button>
         <button
           className="btn-reject"
-          style={{ background: 'var(--text)', flex: 'none', minWidth: '160px' }}
           disabled={resolvingId === 'reject-service'}
           onClick={rejectService}
         >
-          {resolvingId === 'reject-service' ? 'Aplicando...' : '❌ Rechazar Servicio'}
+          {resolvingId === 'reject-service' ? 'Aplicando...' : 'Rechazar servicio'}
+        </button>
+      </div>
+    </div>
+  );
+
+  // Para servicios nuevos: solo el dato y la decisión de aceptar/rechazar, sin
+  // hablar de "revisión completada" (no había nada del Diccionario que revisar)
+  const newServiceResultBox = (
+    <div className="data-card">
+      <h3>Datos del servicio</h3>
+
+      <div className="data-grid">
+        <div><span className="data-field-label">App</span><span className="mono">{finalData.app || 'N/A'}</span></div>
+        <div><span className="data-field-label">Tipo</span><span className="mono">{finalData.type || 'N/A'}</span></div>
+        <div><span className="data-field-label">Verbo</span><span className="mono">{finalData.verb || 'N/A'}</span></div>
+        <div><span className="data-field-label">Ámbito</span>{finalData.scope || 'N/A'}</div>
+        <div><span className="data-field-label">Fiabilidad</span>{finalData.reliability || 'N/A'}</div>
+        <div><span className="data-field-label">Documento</span>{finalData.source_document || 'N/A'} <span className="mono">v{finalData.doc_version || '-'}</span></div>
+
+        <div className="data-field-block">
+          <span className="data-field-label">Uso funcional</span>
+          {finalData.functional_use || 'N/A'}
+        </div>
+
+        <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(finalData.inputs)}</span></div>
+        <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(finalData.outputs)}</span></div>
+        <div className="wide"><span className="data-field-label">Invoca</span><span className="mono">{renderList(finalData.invokes)}</span></div>
+        <div className="wide"><span className="data-field-label">Tablas referenciales</span><span className="mono">{renderList(finalData.reference_tables)}</span></div>
+      </div>
+
+      <div className="buttons" style={{ marginTop: '20px' }}>
+        <button
+          className="btn-accept"
+          disabled={resolvingId === 'accept-close'}
+          onClick={requestAcceptPreview}
+        >
+          {resolvingId === 'accept-close' ? 'Calculando...' : 'Aceptar'}
+        </button>
+        <button
+          className="btn-reject"
+          disabled={resolvingId === 'reject-service'}
+          onClick={rejectService}
+        >
+          {resolvingId === 'reject-service' ? 'Aplicando...' : 'Rechazar'}
         </button>
       </div>
     </div>
   );
 
   const observationsBox = (
-    <div style={{
-        background: 'white', border: '1px solid var(--border)', borderRadius: '6px',
-        padding: '16px', marginBottom: '24px'
-    }}>
-      <h4 style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '10px' }}>
-        📝 Observaciones
-      </h4>
+    <div className="note-block" style={{ marginBottom: '24px' }}>
+      <h4 className="subhead">Observaciones</h4>
       <textarea
         value={observations}
         onChange={(e) => setObservations(e.target.value)}
         placeholder="Añade aquí cualquier nota u observación sobre este servicio (opcional)..."
         rows={3}
         style={{
-          width: '100%', padding: '10px', borderRadius: '6px',
-          border: '1px solid var(--border)', fontSize: '13px',
+          width: '100%', padding: '10px', borderRadius: '2px',
+          border: '1px solid var(--rule)', fontSize: '13px',
           fontFamily: 'inherit', resize: 'vertical'
         }}
       />
       <div style={{ marginTop: '10px', textAlign: 'right' }}>
         <button
-          className="btn-header"
-          style={{ flex: 'none' }}
+          className="btn-quiet"
           disabled={savingObservations}
           onClick={saveObservations}
         >
-          {savingObservations ? 'Guardando...' : 'Guardar Observaciones'}
+          {savingObservations ? 'Guardando...' : 'Guardar observaciones'}
         </button>
       </div>
     </div>
@@ -367,173 +444,217 @@ export default function IterationReview({ service, onServiceClosed }) {
 
   return (
     <div className="iteration-review">
-      <h2 style={{ marginBottom: '16px', color: 'var(--primary-dark)', fontSize: '18px', fontWeight: 'bold' }}>
-        Revisando: {localService.service_name}
+      <h2 style={{ marginBottom: '4px', color: 'var(--ink)', fontSize: '17px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <span className="mono">{localService.service_name}</span>
+        <span className={`stamp ${statusStampClass}`}>{localService.status}</span>
       </h2>
 
-      {observationsBox}
+      {isNewService && (
+        <div className="info-line" style={{ marginTop: '16px' }}>
+          <span className="stamp stamp-amber">Nuevo</span>
+          <span>No existe en el Diccionario Maestro — es un servicio nuevo detectado en el perímetro.</span>
+        </div>
+      )}
+
+      <div style={{ marginTop: isNewService ? '16px' : '20px' }}>
 
       {localService.perimeter_iterations.length === 0 ? (
         <>
-          {dictionaryBox}
-          <div className="empty" style={{border: '1px solid var(--border)', borderRadius: '6px', background: 'white', marginTop: '24px'}}>
+          {!isNewService && dictionaryBox}
+          <div className="empty" style={{ border: '1px solid var(--rule)', borderRadius: '3px', background: 'white', marginTop: '24px' }}>
             No hay iteraciones registradas para este servicio.
           </div>
         </>
       ) : allResolved ? (
-        /* Diccionario y resultado final lado a lado, una vez revisados todos los conflictos */
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-          {dictionaryBox}
-          {finalResultBox}
-        </div>
+        isNewService ? (
+          newServiceResultBox
+        ) : (
+          /* Diccionario y resultado final lado a lado, una vez revisados todos los conflictos */
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+            {dictionaryBox}
+            {finalResultBox}
+          </div>
+        )
       ) : (
         <>
-          <div style={{ marginBottom: '24px' }}>{dictionaryBox}</div>
-          {visibleIterations.map((iteration, index) => (
-          <div key={iteration.iteration_id} className="field-diff">
+          {!isNewService && <div style={{ marginBottom: '24px' }}>{dictionaryBox}</div>}
+          {currentIteration && (
+          <div key={currentIteration.iteration_id} className="field-diff">
 
-            <div className="iteration-header" style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>🔄 Iteración {index + 1} de {visibleIterations.length}</span>
-              <span style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--text-muted)' }}>ID: {iteration.iteration_id}</span>
+            <div className="iteration-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Asiento {currentIteration.iteration_id}</span>
+              <span className="folio-count">Punto {currentPosition} de {totalConflictIterations}</span>
             </div>
 
             {/* Datos detallados de la iteración actual */}
-            <div style={{ marginBottom: '24px', padding: '16px', background: 'white', borderRadius: '4px', border: '1px solid var(--border)' }}>
-              <h4 style={{ fontSize: '12px', color: 'var(--primary-dark)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                📄 Datos Capturados del Perímetro
-              </h4>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', fontSize: '13px' }}>
-                <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>App:</strong> {iteration.data.app || 'N/A'}</div>
-                <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Tipo:</strong> {iteration.data.type || 'N/A'}</div>
-                <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Verbo:</strong> {iteration.data.verb || 'N/A'}</div>
-                <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Ámbito:</strong> {iteration.data.scope || 'N/A'}</div>
-                <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Fiabilidad:</strong> {iteration.data.reliability || 'N/A'}</div>
-                <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Documento:</strong> {iteration.data.source_document || 'N/A'} (v{iteration.data.doc_version || '-'})</div>
+            <div style={{ margin: '18px 0' }}>
+              <h4 className="subhead">Datos capturados del perímetro</h4>
+              <div className="data-grid">
+                <div><span className="data-field-label">App</span><span className="mono">{currentIteration.data.app || 'N/A'}</span></div>
+                <div><span className="data-field-label">Tipo</span><span className="mono">{currentIteration.data.type || 'N/A'}</span></div>
+                <div><span className="data-field-label">Verbo</span><span className="mono">{currentIteration.data.verb || 'N/A'}</span></div>
+                <div><span className="data-field-label">Ámbito</span>{currentIteration.data.scope || 'N/A'}</div>
+                <div><span className="data-field-label">Fiabilidad</span>{currentIteration.data.reliability || 'N/A'}</div>
+                <div><span className="data-field-label">Documento</span>{currentIteration.data.source_document || 'N/A'} <span className="mono">v{currentIteration.data.doc_version || '-'}</span></div>
 
-                <div style={{ gridColumn: '1 / -1', background: '#f8f9fa', padding: '12px', borderRadius: '4px', marginTop: '4px', border: '1px solid var(--border)' }}>
-                    <strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase', marginBottom: '4px'}}>Uso Funcional:</strong> 
-                    {iteration.data.functional_use || 'N/A'}
+                <div className="data-field-block">
+                  <span className="data-field-label">Uso funcional</span>
+                  {currentIteration.data.functional_use || 'N/A'}
                 </div>
 
-                <div style={{ gridColumn: '1 / -1', marginTop: '4px' }}><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Entradas:</strong> {renderList(iteration.data.inputs)}</div>
-                <div style={{ gridColumn: '1 / -1' }}><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Salidas:</strong> {renderList(iteration.data.outputs)}</div>
-                <div style={{ gridColumn: '1 / -1' }}><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Invoca:</strong> {renderList(iteration.data.invokes)}</div>
-                <div style={{ gridColumn: '1 / -1' }}><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Tablas Referenciales:</strong> {renderList(iteration.data.reference_tables)}</div>
+                <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(currentIteration.data.inputs)}</span></div>
+                <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(currentIteration.data.outputs)}</span></div>
+                <div className="wide"><span className="data-field-label">Invoca</span><span className="mono">{renderList(currentIteration.data.invokes)}</span></div>
+                <div className="wide"><span className="data-field-label">Tablas referenciales</span><span className="mono">{renderList(currentIteration.data.reference_tables)}</span></div>
               </div>
             </div>
 
             {/* Mapeo de Conflictos */}
-            <div style={{ background: '#fff9f0', padding: '16px', borderRadius: '4px', border: '1px solid #ffe0b2' }}>
-                <h4 style={{ fontSize: '13px', color: 'var(--warning)', marginBottom: '16px', textTransform: 'uppercase', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  ⚠️ Conflictos Detectados ({iteration.conflicts.length})
+            <div className="conflict-block">
+                <h4 className="subhead" style={{ marginBottom: '16px' }}>
+                  Conflictos detectados ({currentIteration.conflicts.length})
                 </h4>
 
-                {iteration.conflicts.map((conflict, idx) => (
-                  <div key={idx} style={{ marginBottom: '16px', borderLeft: '3px solid var(--warning)', paddingLeft: '16px', background: 'white', padding: '12px', borderRadius: '0 4px 4px 0', border: '1px solid var(--border)', borderLeftColor: 'var(--warning)' }}>
-                    <div className="field-name" style={{color: 'var(--primary-dark)'}}>Columna: {conflict.column === 'document' ? 'Documento (origen + versión)' : conflict.column}</div>
+                {currentIteration.conflicts.map((conflict, idx) => (
+                  <div key={idx} className="conflict-row">
+                    <div className="field-name">
+                      <span className="mono">{conflict.column === 'document' ? 'documento + versión' : conflict.column}</span>
+                    </div>
                     <div className="field-values">
-                      <div className="value-box" style={{ background: '#f1f1f1' }}>
-                        <div className="label">Valor Anterior</div>
-                        <div style={{ color: 'var(--text)' }}>
+                      <div className="value-box">
+                        <div className="label">Valor anterior</div>
+                        <div style={{ color: 'var(--text-muted)' }}>
                           {conflict.original || 'N/D'}
                         </div>
                       </div>
                       <div className="value-box">
-                        <div className="label">Nueva Propuesta</div>
-                        <div style={{ color: 'var(--success)', fontWeight: 'bold' }}>
+                        <div className="label">Nueva propuesta</div>
+                        <div style={{ color: 'var(--ink)', fontWeight: 600 }}>
                           {conflict.proposed || 'N/D'}
                         </div>
                       </div>
                     </div>
                   </div>
                 ))}
-                
+
                 <div className="buttons">
                   <button
                     className="btn-unify"
-                    disabled={resolvingId === iteration.iteration_id}
-                    onClick={() => resolveIteration(iteration.iteration_id, 'unify')}
+                    disabled={resolvingId === currentIteration.iteration_id}
+                    onClick={() => resolveIteration(currentIteration.iteration_id, 'unify')}
                   >
-                    {resolvingId === iteration.iteration_id ? 'Aplicando...' : 'Unificar'}
+                    {resolvingId === currentIteration.iteration_id ? 'Aplicando...' : 'Unificar'}
                   </button>
                   <button
                     className="btn-reject"
-                    disabled={resolvingId === iteration.iteration_id}
-                    onClick={() => resolveIteration(iteration.iteration_id, 'reject')}
+                    disabled={resolvingId === currentIteration.iteration_id}
+                    onClick={() => resolveIteration(currentIteration.iteration_id, 'reject')}
                   >
-                    {resolvingId === iteration.iteration_id ? 'Aplicando...' : 'Rechazar Cambios'}
+                    {resolvingId === currentIteration.iteration_id ? 'Aplicando...' : 'Rechazar cambios'}
                   </button>
                 </div>
               </div>
 
+            {/* Observaciones propias de esta iteración */}
+            <div className="note-block" style={{ marginTop: '16px' }}>
+              <h4 className="subhead" style={{ marginBottom: '8px' }}>Observaciones de esta iteración</h4>
+              <textarea
+                value={iterationObservations}
+                onChange={(e) => setIterationObservations(e.target.value)}
+                placeholder="Notas sobre esta iteración (opcional)..."
+                rows={2}
+                style={{
+                  width: '100%', padding: '8px', borderRadius: '2px',
+                  border: '1px solid var(--rule)', fontSize: '13px',
+                  fontFamily: 'inherit', resize: 'vertical'
+                }}
+              />
+              <div style={{ marginTop: '8px', textAlign: 'right' }}>
+                <button
+                  className="btn-quiet"
+                  disabled={savingIterationObservations}
+                  onClick={() => saveIterationObservations(currentIteration.iteration_id)}
+                >
+                  {savingIterationObservations ? 'Guardando...' : 'Guardar observaciones'}
+                </button>
+              </div>
             </div>
-          ))}
+
+            </div>
+          )}
         </>
       )}
 
       {resolvedIterations.length > 0 && (
         <div style={{ marginTop: '20px' }}>
-          <h4 style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
-            Iteraciones ya revisadas
-          </h4>
-          {resolvedIterations.map(it => (
-            <div
-              key={it.iteration_id}
-              style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '10px 14px', background: '#f8f9fa', border: '1px solid var(--border)',
-                borderRadius: '6px', marginBottom: '8px', fontSize: '13px'
-              }}
-            >
-              <span>✔️ Iteración {it.iteration_id} — {resolutionLabel(it.resolution)}</span>
-              <button
-                className="btn-header"
-                style={{ flex: 'none', padding: '6px 12px', fontSize: '12px' }}
-                disabled={resolvingId === it.iteration_id}
-                onClick={() => revertIteration(it.iteration_id)}
+          <h4 className="subhead">Asientos ya revisados</h4>
+          {resolvedIterations.map(it => {
+            const stamp = resolutionStamp(it.resolution);
+            return (
+              <div
+                key={it.iteration_id}
+                style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '10px 14px', background: 'white', border: '1px solid var(--rule)',
+                  marginBottom: '8px', fontSize: '13px'
+                }}
               >
-                {resolvingId === it.iteration_id ? 'Aplicando...' : '↩ Volver atrás'}
-              </button>
-            </div>
-          ))}
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="mono">Asiento {it.iteration_id}</span>
+                  <span className={`stamp ${stamp.cls}`}>{stamp.label}</span>
+                </span>
+                <button
+                  className="btn-quiet"
+                  disabled={resolvingId === it.iteration_id}
+                  onClick={() => revertIteration(it.iteration_id)}
+                >
+                  {resolvingId === it.iteration_id ? 'Aplicando...' : 'Volver atrás'}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
+
+      {isNewService && <div style={{ marginTop: '20px' }}>{observationsBox}</div>}
+
+      </div>
 
       {previewData && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center',
+          background: 'rgba(21,48,47,0.55)', display: 'flex', alignItems: 'center',
           justifyContent: 'center', zIndex: 2000, padding: '20px'
         }}>
           <div style={{
-            background: 'white', borderRadius: '8px', padding: '24px',
+            background: 'white', borderRadius: '4px', padding: '24px',
             maxWidth: '640px', width: '100%', maxHeight: '85vh', overflowY: 'auto',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+            border: '1px solid var(--rule)'
           }}>
-            <h3 style={{ color: 'var(--primary-dark)', marginBottom: '8px', fontSize: '16px' }}>
-              📋 Así quedará en el Diccionario
+            <h3 style={{ color: 'var(--ink)', marginBottom: '6px', fontSize: '15px', fontWeight: 600 }}>
+              Así quedará en el Diccionario
             </h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '20px' }}>
-              Resultado final de la revisión de <strong>{localService.service_name}</strong> (ya incluye lo unificado con el Diccionario en cada iteración). Nada se elimina ni se sobrescribe.
+              Resultado de unir la revisión final de <strong className="mono">{localService.service_name}</strong> con el dato maestro actual del Diccionario. Nada se elimina ni se sobrescribe.
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '14px', fontSize: '13px' }}>
-              <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>App:</strong> {previewData.app || 'N/A'}</div>
-              <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Tipo:</strong> {previewData.type || 'N/A'}</div>
-              <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Verbo:</strong> {previewData.verb || 'N/A'}</div>
-              <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Ámbito:</strong> {previewData.scope || 'N/A'}</div>
-              <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Fiabilidad:</strong> {previewData.reliability || 'N/A'}</div>
-              <div><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Documento:</strong> {previewData.source_document || 'N/A'} (v{previewData.doc_version || '-'})</div>
+            <div className="data-grid">
+              <div><span className="data-field-label">App</span><span className="mono">{previewData.app || 'N/A'}</span></div>
+              <div><span className="data-field-label">Tipo</span><span className="mono">{previewData.type || 'N/A'}</span></div>
+              <div><span className="data-field-label">Verbo</span><span className="mono">{previewData.verb || 'N/A'}</span></div>
+              <div><span className="data-field-label">Ámbito</span>{previewData.scope || 'N/A'}</div>
+              <div><span className="data-field-label">Fiabilidad</span>{previewData.reliability || 'N/A'}</div>
+              <div><span className="data-field-label">Documento</span>{previewData.source_document || 'N/A'} <span className="mono">v{previewData.doc_version || '-'}</span></div>
 
-              <div style={{ gridColumn: '1 / -1', background: '#f8f9fa', padding: '12px', borderRadius: '4px', border: '1px solid var(--border)' }}>
-                <strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase', marginBottom: '4px'}}>Uso Funcional:</strong>
+              <div className="data-field-block">
+                <span className="data-field-label">Uso funcional</span>
                 {previewData.functional_use || 'N/A'}
               </div>
 
-              <div style={{ gridColumn: '1 / -1' }}><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Entradas:</strong> {renderList(previewData.inputs)}</div>
-              <div style={{ gridColumn: '1 / -1' }}><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Salidas:</strong> {renderList(previewData.outputs)}</div>
-              <div style={{ gridColumn: '1 / -1' }}><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Invoca:</strong> {renderList(previewData.invokes)}</div>
-              <div style={{ gridColumn: '1 / -1' }}><strong style={{color: 'var(--text-muted)', display: 'block', fontSize: '11px', textTransform: 'uppercase'}}>Tablas Referenciales:</strong> {renderList(previewData.reference_tables)}</div>
+              <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(previewData.inputs)}</span></div>
+              <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(previewData.outputs)}</span></div>
+              <div className="wide"><span className="data-field-label">Invoca</span><span className="mono">{renderList(previewData.invokes)}</span></div>
+              <div className="wide"><span className="data-field-label">Tablas referenciales</span><span className="mono">{renderList(previewData.reference_tables)}</span></div>
             </div>
 
             <div className="buttons" style={{ marginTop: '24px' }}>
@@ -542,10 +663,11 @@ export default function IterationReview({ service, onServiceClosed }) {
                 disabled={resolvingId === 'accept-close'}
                 onClick={confirmAcceptAndClose}
               >
-                {resolvingId === 'accept-close' ? 'Aplicando...' : '✅ Confirmar y Cerrar'}
+                {resolvingId === 'accept-close' ? 'Aplicando...' : 'Confirmar y cerrar'}
               </button>
               <button
-                className="btn-reject"
+                className="btn-quiet"
+                style={{ flex: 1, textAlign: 'center' }}
                 disabled={resolvingId === 'accept-close'}
                 onClick={() => setPreviewData(null)}
               >
@@ -561,13 +683,13 @@ export default function IterationReview({ service, onServiceClosed }) {
           position: 'fixed',
           bottom: '24px',
           right: '24px',
-          background: toast.startsWith('❌') ? 'var(--error)' : 'var(--primary-dark)',
+          background: toast.startsWith('❌') ? 'var(--rust)' : 'var(--ink)',
           color: 'white',
-          padding: '14px 20px',
-          borderRadius: '8px',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
-          fontWeight: 600,
-          fontSize: '14px',
+          padding: '13px 18px',
+          borderRadius: '2px',
+          boxShadow: '0 6px 20px rgba(0,0,0,0.18)',
+          fontWeight: 500,
+          fontSize: '13.5px',
           zIndex: 1000
         }}>
           {toast}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import IterationReview from './components/IterationReview';
+import DictionaryEntry from './components/DictionaryEntry';
 import './index.css';
 
 export default function App() {
@@ -7,8 +8,8 @@ export default function App() {
   const [selectedService, setSelectedService] = useState(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('conflicts');
-  
-  // 1. NUEVO ESTADO: Guardará lo que el usuario escriba en el buscador
+
+  // Guarda lo que el usuario escriba en el buscador
   const [searchTerm, setSearchTerm] = useState('');
   const [toast, setToast] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -52,16 +53,16 @@ export default function App() {
     setLoading(true);
     setView('dictionary');
     setSearchTerm(''); // Limpiamos el buscador al cambiar de pestaña
-    
+
     fetch('/api/v1/services/')
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
       .then(data => {
-        // Resueltos: ya cerrados o sin nada pendiente de decidir
-        const resolved = data.filter(s => !isPending(s));
-        setServices(resolved);
+        // Diccionario completo: servicios que ya forman parte del Diccionario final
+        const inDictionary = data.filter(s => s.is_in_dictionary);
+        setServices(inDictionary);
         setSelectedService(null);
         setLoading(false);
       })
@@ -85,7 +86,7 @@ export default function App() {
       })
       .then(data => {
         if (data.saved) {
-          showToast(`💾 Guardado en Excel: ${data.services_written} servicio(s) volcados al Diccionario`);
+          showToast(`✅ Guardado en Excel: ${data.services_written} servicio(s) volcados al Diccionario`);
         } else {
           showToast(`⚠️ Aún quedan ${data.pending_services} servicio(s) con conflictos sin revisar`);
         }
@@ -98,65 +99,54 @@ export default function App() {
     loadConflicts();
   }, []);
 
-  // 2. LÓGICA DE FILTRADO: Comparamos el nombre del servicio con el término de búsqueda
-  const filteredServices = services.filter(service => 
+  // Filtra por nombre de servicio según el término de búsqueda
+  const filteredServices = services.filter(service =>
     service.service_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="container">
       <header>
-        <h1>🔧 Gestor de Conflictos de Servicios</h1>
-        <p>Resuelve conflictos entre iteraciones de datos del perímetro</p>
-        <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+        <span className="eyebrow">Cajamar · Registro de servicios</span>
+        <h1>Gestor de Conflictos de Servicios</h1>
+        <p>Concilia el Perímetro frente al Diccionario y resuelve cada conflicto sin perder datos</p>
+        <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
           <button className="btn-header" onClick={loadConflicts}>
-            🔄 Recargar Conflictos
+            Revisar servicios
           </button>
           <button className="btn-header" onClick={loadDictionary}>
-            📚 Ver Diccionario Resuelto
+            Ver diccionario completo
           </button>
           <button className="btn-header" onClick={saveToExcel} disabled={saving}>
-            {saving ? '⏳ Guardando...' : '🗂️ Sobrescribir Diccionario Final'}
+            {saving ? 'Guardando...' : 'Sobrescribir diccionario final'}
           </button>
         </div>
       </header>
 
       <div className="panel">
         {loading ? (
-          <div className="loading">⏳ Cargando {view === 'conflicts' ? 'pendientes' : 'diccionario'}...</div>
+          <div className="loading">Cargando {view === 'conflicts' ? 'pendientes' : 'diccionario'}...</div>
         ) : services.length === 0 ? (
-          <div className="empty">✨ {view === 'conflicts' ? 'No hay nada pendiente de revisión' : 'Diccionario vacío'}</div>
+          <div className="empty">{view === 'conflicts' ? 'No hay nada pendiente de revisión' : 'El Diccionario todavía no tiene servicios'}</div>
         ) : (
           <>
             <h2>
-              {view === 'conflicts' ? '⚠️ Pendientes de Revisión' : '📚 Diccionario'}
-              <span style={{ fontSize: '14px', color: 'var(--text-light)', marginLeft: '8px' }}>
-                ({filteredServices.length} de {services.length})
+              {view === 'conflicts' ? 'Pendientes de revisión' : 'Diccionario completo'}
+              <span className="mono" style={{ fontSize: '13px', color: 'var(--text-muted)', textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>
+                {filteredServices.length} de {services.length}
               </span>
             </h2>
 
-            {/* 3. INTERFAZ DEL BUSCADOR */}
             <div style={{ marginBottom: '16px' }}>
-              <input 
-                type="text" 
-                placeholder="🔍 Buscar servicio por nombre..." 
+              <input
+                type="text"
+                className="search-input"
+                placeholder="Buscar servicio por nombre..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border)',
-                  fontSize: '14px',
-                  outline: 'none',
-                  transition: 'border-color 0.3s'
-                }}
-                onFocus={(e) => e.target.style.borderColor = 'var(--accent)'}
-                onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
               />
             </div>
 
-            {/* 4. RENDERIZADO DE LA LISTA FILTRADA */}
             {filteredServices.length === 0 ? (
               <div className="empty" style={{ padding: '40px 20px' }}>
                 No se encontraron servicios que coincidan con "<strong>{searchTerm}</strong>"
@@ -169,12 +159,13 @@ export default function App() {
                   onClick={() => setSelectedService(service)}
                 >
                   <div className="service-name">{service.service_name}</div>
-                  <div style={{ fontSize: '12px', color: view === 'conflicts' ? 'inherit' : '#555', marginTop: '4px' }}>
-                    {service.is_in_dictionary && <span className="badge badge-dict">📚 En diccionario</span>}
-                    {!service.is_in_dictionary && <span className="badge" style={{ background: '#fff3cd', color: '#856404' }}>🆕 Nuevo</span>}
+                  <div style={{ fontSize: '12px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {service.is_in_dictionary
+                      ? <span className="stamp stamp-moss">En diccionario</span>
+                      : <span className="stamp stamp-amber">Nuevo</span>}
                     {service.perimeter_iterations?.length > 0 && (
-                      <span style={{ marginLeft: '6px', fontSize: '11px', opacity: 0.7 }}>
-                        • {service.perimeter_iterations.length} iteraciones
+                      <span className="mono" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        {service.perimeter_iterations.length} iteraciones
                       </span>
                     )}
                   </div>
@@ -187,15 +178,19 @@ export default function App() {
 
       <div className="panel">
         {selectedService ? (
-          <IterationReview
-            service={selectedService}
-            onServiceClosed={(name) => {
-              setServices(prev => prev.filter(s => s.service_name !== name));
-              setSelectedService(null);
-            }}
-          />
+          view === 'dictionary' ? (
+            <DictionaryEntry service={selectedService} />
+          ) : (
+            <IterationReview
+              service={selectedService}
+              onServiceClosed={(name) => {
+                setServices(prev => prev.filter(s => s.service_name !== name));
+                setSelectedService(null);
+              }}
+            />
+          )
         ) : (
-          <div className="empty">👈 Selecciona un servicio para revisar {view === 'conflicts' ? 'iteraciones y conflictos' : 'detalles'}</div>
+          <div className="empty">Selecciona un servicio para {view === 'conflicts' ? 'revisar iteraciones y conflictos' : 'ver sus datos'}</div>
         )}
       </div>
 
@@ -204,13 +199,13 @@ export default function App() {
           position: 'fixed',
           bottom: '24px',
           right: '24px',
-          background: toast.startsWith('❌') ? 'var(--error)' : (toast.startsWith('⚠️') ? 'var(--warning)' : 'var(--primary-dark)'),
+          background: toast.startsWith('❌') ? 'var(--rust)' : (toast.startsWith('⚠️') ? 'var(--amber-ink)' : 'var(--ink)'),
           color: 'white',
-          padding: '14px 20px',
-          borderRadius: '8px',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
-          fontWeight: 600,
-          fontSize: '14px',
+          padding: '13px 18px',
+          borderRadius: '2px',
+          boxShadow: '0 6px 20px rgba(0,0,0,0.18)',
+          fontWeight: 500,
+          fontSize: '13.5px',
           zIndex: 1000,
           maxWidth: '360px'
         }}>
