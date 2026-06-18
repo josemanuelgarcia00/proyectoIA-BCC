@@ -272,3 +272,49 @@ def accept_and_close(item_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/{item_id}/reject",
+    response_model=ServiceResponseDTO,
+    summary="Rechazar el servicio (no incorporarlo al Diccionario)"
+)
+def reject_service(item_id: str):
+    """Marca el servicio como descartado y lo cierra, sin borrar ningún dato"""
+    try:
+        service = ServiceService()
+        domain_entity = service.reject_service(item_id.upper())
+
+        if not domain_entity:
+            raise HTTPException(status_code=404, detail="Servicio no encontrado")
+
+        return ServiceResponseDTO.from_domain(domain_entity)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class ObservationsRequest(BaseModel):
+    observations: str
+
+
+@router.put(
+    "/{item_id}/observations",
+    response_model=ServiceResponseDTO,
+    summary="Guardar observaciones de un servicio"
+)
+def update_observations(item_id: str, payload: ObservationsRequest):
+    """Guarda notas libres del usuario asociadas a un servicio"""
+    try:
+        service = ServiceService()
+        domain_entity = service.update_observations(item_id.upper(), payload.observations)
+
+        if not domain_entity:
+            raise HTTPException(status_code=404, detail="Servicio no encontrado")
+
+        return ServiceResponseDTO.from_domain(domain_entity)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

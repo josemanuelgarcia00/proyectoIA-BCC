@@ -106,6 +106,29 @@ class ServiceService:
 
         return ConflictResolver.accept_and_close(service)
 
+    def reject_service(self, item_id: str):
+        """
+        Rechaza por completo un servicio (p.ej. uno nuevo que no se quiere
+        incorporar al Diccionario). Devuelve None si no existe.
+        """
+        service = self.repo.get_by_id(item_id)
+        if not service:
+            return None
+
+        return ConflictResolver.reject_service(service)
+
+    def update_observations(self, item_id: str, observations: str):
+        """
+        Guarda observaciones libres del usuario sobre un servicio.
+        Devuelve None si no existe.
+        """
+        service = self.repo.get_by_id(item_id)
+        if not service:
+            return None
+
+        service.observations = observations
+        return service
+
     def save_to_excel(self):
         """
         Si ya no quedan conflictos pendientes en ningún servicio, vuelca el resultado

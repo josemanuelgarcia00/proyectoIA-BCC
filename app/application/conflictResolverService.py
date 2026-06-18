@@ -131,6 +131,17 @@ class ConflictResolver:
         return service
 
     @staticmethod
+    def reject_service(service: ServiceEntity) -> ServiceEntity:
+        """
+        Rechaza el servicio por completo (p.ej. un servicio nuevo que no se quiere
+        incorporar al Diccionario). No se borra ningún dato, solo se marca como
+        descartado y se cierra para que deje de aparecer entre los pendientes.
+        """
+        service.closed = True
+        service.consolidated_status = "Desechado"
+        return service
+
+    @staticmethod
     def preview_final_merge(service: ServiceEntity) -> Optional[ExcelRowData]:
         """
         Calcula (sin aplicar nada) cómo quedaría el dato final para el Diccionario.

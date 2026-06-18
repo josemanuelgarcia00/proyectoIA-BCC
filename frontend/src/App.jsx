@@ -18,6 +18,10 @@ export default function App() {
     setTimeout(() => setToast(null), 5000);
   };
 
+  // Pendiente de revisión: tiene conflictos sin resolver, o es un servicio nuevo
+  // (no está en el Diccionario) que todavía no se ha aceptado ni rechazado.
+  const isPending = (s) => !s.closed && (s.requires_attention || !s.is_in_dictionary);
+
   const loadConflicts = () => {
     setLoading(true);
     setView('conflicts');
@@ -32,8 +36,8 @@ export default function App() {
         return r.json();
       })
       .then(data => {
-        // Filtramos solo los que requieren atención
-        const conflicts = data.filter(s => s.requires_attention);
+        // Pendientes: con conflictos o servicios nuevos aún sin decisión
+        const conflicts = data.filter(isPending);
         setServices(conflicts);
         setSelectedService(null);
         setLoading(false);
@@ -55,8 +59,8 @@ export default function App() {
         return r.json();
       })
       .then(data => {
-        // Filtramos los que NO requieren atención
-        const resolved = data.filter(s => !s.requires_attention);
+        // Resueltos: ya cerrados o sin nada pendiente de decidir
+        const resolved = data.filter(s => !isPending(s));
         setServices(resolved);
         setSelectedService(null);
         setLoading(false);
@@ -119,13 +123,13 @@ export default function App() {
 
       <div className="panel">
         {loading ? (
-          <div className="loading">⏳ Cargando {view === 'conflicts' ? 'conflictos' : 'diccionario'}...</div>
+          <div className="loading">⏳ Cargando {view === 'conflicts' ? 'pendientes' : 'diccionario'}...</div>
         ) : services.length === 0 ? (
-          <div className="empty">✨ {view === 'conflicts' ? 'No hay conflictos pendientes' : 'Diccionario vacío'}</div>
+          <div className="empty">✨ {view === 'conflicts' ? 'No hay nada pendiente de revisión' : 'Diccionario vacío'}</div>
         ) : (
           <>
             <h2>
-              {view === 'conflicts' ? '⚠️ Conflictos' : '📚 Diccionario'} 
+              {view === 'conflicts' ? '⚠️ Pendientes de Revisión' : '📚 Diccionario'}
               <span style={{ fontSize: '14px', color: 'var(--text-light)', marginLeft: '8px' }}>
                 ({filteredServices.length} de {services.length})
               </span>

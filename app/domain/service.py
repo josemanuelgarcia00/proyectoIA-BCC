@@ -48,6 +48,7 @@ class ServiceEntity(BaseModel):
     dictionary_data: Optional[dict] = None
     perimeter_iterations: List[PerimeterIteration] = []
     closed: bool = False  # True cuando el usuario aceptó la revisión final y cerró el servicio
+    observations: str = ""  # Notas libres del usuario sobre este servicio
 
     def has_critical_conflicts(self) -> bool:
         """Método de negocio: determina si hay conflictos críticos"""

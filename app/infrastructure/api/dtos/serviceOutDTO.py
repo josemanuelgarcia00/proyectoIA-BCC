@@ -41,6 +41,7 @@ class ServiceResponseDTO(BaseModel):
     is_in_dictionary: bool
     requires_attention: bool  # Calculado a partir de la lógica de negocio
     closed: bool = False
+    observations: str = ""
     dictionary_data: Optional[ExcelRowDataResponseDTO] = None  # Datos del maestro
     perimeter_iterations: List[PerimeterIterationResponseDTO]
 
@@ -104,6 +105,7 @@ class ServiceResponseDTO(BaseModel):
             is_in_dictionary=True if entity.exists_in_dictionary.lower() == "si" else False,
             requires_attention=entity.has_critical_conflicts(),
             closed=entity.closed,
+            observations=entity.observations,
             dictionary_data=dict_data_dto,
             perimeter_iterations=iterations_dto
         )

@@ -6,6 +6,8 @@ export default function IterationReview({ service, onServiceClosed }) {
   const [toast, setToast] = useState(null);
   const [resolvingId, setResolvingId] = useState(null);
   const [previewData, setPreviewData] = useState(null);
+  const [observations, setObservations] = useState(service?.observations || '');
+  const [savingObservations, setSavingObservations] = useState(false);
 
   // Cuando se selecciona otro servicio en la lista, reiniciamos el estado local
   useEffect(() => {
@@ -13,6 +15,7 @@ export default function IterationReview({ service, onServiceClosed }) {
     setHiddenIterations(new Set());
     setToast(null);
     setPreviewData(null);
+    setObservations(service?.observations || '');
   }, [service]);
 
   if (!localService || !localService.perimeter_iterations) {
@@ -154,6 +157,60 @@ export default function IterationReview({ service, onServiceClosed }) {
     }
   };
 
+  const rejectService = async () => {
+    const confirmed = window.confirm(
+      `¿Seguro que quieres rechazar "${localService.service_name}"? No se incorporará al Diccionario.`
+    );
+    if (!confirmed) return;
+
+    setResolvingId('reject-service');
+    try {
+      const res = await fetch(
+        `/api/v1/services/${encodeURIComponent(localService.service_name)}/reject`,
+        { method: 'POST' }
+      );
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'No se pudo rechazar el servicio');
+      }
+
+      showToast(`❌ ${localService.service_name} rechazado`);
+      if (onServiceClosed) onServiceClosed(localService.service_name);
+    } catch (e) {
+      showToast(`❌ ${e.message}`);
+    } finally {
+      setResolvingId(null);
+    }
+  };
+
+  const saveObservations = async () => {
+    setSavingObservations(true);
+    try {
+      const res = await fetch(
+        `/api/v1/services/${encodeURIComponent(localService.service_name)}/observations`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ observations })
+        }
+      );
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'No se pudieron guardar las observaciones');
+      }
+
+      const updated = await res.json();
+      setLocalService(updated);
+      showToast('📝 Observaciones guardadas');
+    } catch (e) {
+      showToast(`❌ ${e.message}`);
+    } finally {
+      setSavingObservations(false);
+    }
+  };
+
   // Solo interesa mostrar iteraciones con conflictos pendientes de revisar
   const visibleIterations = localService.perimeter_iterations.filter(
     it => it.conflicts && it.conflicts.length > 0 && !hiddenIterations.has(it.iteration_id)
@@ -264,6 +321,46 @@ export default function IterationReview({ service, onServiceClosed }) {
         >
           {resolvingId === 'reset' ? 'Aplicando...' : '↺ Reiniciar Conflicto'}
         </button>
+        <button
+          className="btn-reject"
+          style={{ background: 'var(--text)', flex: 'none', minWidth: '160px' }}
+          disabled={resolvingId === 'reject-service'}
+          onClick={rejectService}
+        >
+          {resolvingId === 'reject-service' ? 'Aplicando...' : '❌ Rechazar Servicio'}
+        </button>
+      </div>
+    </div>
+  );
+
+  const observationsBox = (
+    <div style={{
+        background: 'white', border: '1px solid var(--border)', borderRadius: '6px',
+        padding: '16px', marginBottom: '24px'
+    }}>
+      <h4 style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '10px' }}>
+        📝 Observaciones
+      </h4>
+      <textarea
+        value={observations}
+        onChange={(e) => setObservations(e.target.value)}
+        placeholder="Añade aquí cualquier nota u observación sobre este servicio (opcional)..."
+        rows={3}
+        style={{
+          width: '100%', padding: '10px', borderRadius: '6px',
+          border: '1px solid var(--border)', fontSize: '13px',
+          fontFamily: 'inherit', resize: 'vertical'
+        }}
+      />
+      <div style={{ marginTop: '10px', textAlign: 'right' }}>
+        <button
+          className="btn-header"
+          style={{ flex: 'none' }}
+          disabled={savingObservations}
+          onClick={saveObservations}
+        >
+          {savingObservations ? 'Guardando...' : 'Guardar Observaciones'}
+        </button>
       </div>
     </div>
   );
@@ -273,6 +370,8 @@ export default function IterationReview({ service, onServiceClosed }) {
       <h2 style={{ marginBottom: '16px', color: 'var(--primary-dark)', fontSize: '18px', fontWeight: 'bold' }}>
         Revisando: {localService.service_name}
       </h2>
+
+      {observationsBox}
 
       {localService.perimeter_iterations.length === 0 ? (
         <>
