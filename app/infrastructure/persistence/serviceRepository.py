@@ -1,4 +1,6 @@
-from app.infrastructure.storage.dataSourceFactory import build_reader
+from app.infrastructure.storage.dataSourceFactory import build_reader, get_excel_path
+from app.infrastructure.storage.auditLog import ExcelAuditLog
+from app.application.conflictResolverService import ConflictResolver
 from app.domain.service import ServiceEntity
 
 
@@ -39,6 +41,7 @@ class CatalogRepository:
             self.dictionary_cache = self.reader._build_dictionary_index(dictionary_records)
             self.services_cache = self.reader.extract_services_from_perimeter()
             self._source_signature = self.reader.get_signature()
+            self._replay_audit_log()
             print(f"✅ Se cargaron {len(self.services_cache)} servicios")
 
             # Mostrar resumen de conflictos
@@ -55,6 +58,65 @@ class CatalogRepository:
             print(f"❌ Error al leer la fuente de datos: {str(e)}")
             self.services_cache = []
             self.dictionary_cache = {}
+
+    def _replay_audit_log(self):
+        """
+        Reproduce sobre el catálogo recién cargado las decisiones registradas en
+        la hoja Auditoria, en el mismo orden en que se tomaron. Esto reconstruye
+        el estado de revisión aunque el servidor se haya reiniciado entre medias:
+        la fuente de verdad de las decisiones es esa hoja, no la caché en memoria.
+
+        Por ahora la auditoría solo existe sobre el Excel físico local (todavía
+        no hay acceso a la API de Google Sheets para esto); si el archivo no
+        existe o no tiene hoja Auditoria, simplemente no hay nada que reproducir.
+        """
+        entries = ExcelAuditLog(get_excel_path()).read_all()
+
+        for entry in entries:
+            service = self._find_in_cache(str(entry.get("servicio", "")))
+            if service is None:
+                continue
+
+            accion = str(entry.get("accion", ""))
+            valor = str(entry.get("valor", ""))
+            iteracion_raw = str(entry.get("iteracion", "")).strip()
+            iteracion = int(iteracion_raw) if iteracion_raw else None
+
+            if accion == "resolve_iteration" and iteracion is not None:
+                ConflictResolver.resolve_iteration(service, iteracion, valor or "unify")
+            elif accion == "revert_iteration" and iteracion is not None:
+                ConflictResolver.revert_iteration(service, iteracion)
+            elif accion == "reset_service":
+                ConflictResolver.reset_service(service)
+            elif accion == "accept_and_close":
+                ConflictResolver.accept_and_close(service)
+            elif accion == "reject_service":
+                ConflictResolver.reject_service(service)
+            elif accion == "revert_rejection":
+                ConflictResolver.revert_rejection(service)
+            elif accion == "update_observations":
+                service.observations = valor
+            elif accion == "update_iteration_observations" and iteracion is not None:
+                iteration = next(
+                    (it for it in service.perimeter_iterations if it.iteration_id == iteracion),
+                    None
+                )
+                if iteration:
+                    iteration.observations = valor
+
+    def _find_in_cache(self, name: str) -> ServiceEntity:
+        """Busca un servicio por nombre directamente en la caché ya cargada,
+        sin disparar refresh_if_source_changed (a diferencia de get_by_id),
+        para poder usarse durante la propia carga sin recursión."""
+        if not self.services_cache:
+            return None
+
+        name_upper = name.upper()
+        for service in self.services_cache:
+            if service.name.upper() == name_upper:
+                return service
+
+        return None
 
     def refresh(self):
         """Recarga los servicios desde la fuente de datos"""
@@ -94,15 +156,7 @@ class CatalogRepository:
 
     def get_by_id(self, item_id: str) -> ServiceEntity:
         """Busca un servicio específico por su ID (nombre)"""
-        if not self.services_cache:
-            return None
-
-        item_id_upper = item_id.upper()
-        for service in self.services_cache:
-            if service.name.upper() == item_id_upper:
-                return service
-
-        return None
+        return self._find_in_cache(item_id)
 
     def get_services_with_conflicts(self) -> list:
         """Retorna solo servicios que tienen conflictos"""
