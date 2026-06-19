@@ -224,21 +224,34 @@ class ServiceService:
         self._log_decision(service, "update_iteration_observations", observations, iteration_id)
         return service
 
-    def save_to_excel(self):
+    def save_to_excel(self, service_names: list = None):
         """
-        Si ya no quedan conflictos pendientes en ningún servicio, vuelca el resultado
-        final de cada uno a la hoja Diccionario del Excel de origen.
+        Vuelca a la hoja Diccionario (y Desechados) del Excel de origen el
+        resultado final de los servicios indicados en service_names. No hace
+        falta tener todo el catálogo procesado: solo se exige que los servicios
+        SELECCIONADOS ya no tengan conflictos pendientes; el resto del catálogo
+        se queda como está, pendiente para una futura sesión de guardado.
+
+        Si service_names es None (compatibilidad), se considera el catálogo
+        completo, como antes.
         """
         all_services = self.repo.get_all()
+
+        if service_names:
+            selected = {name.upper() for name in service_names}
+            target_services = [s for s in all_services if s.name.upper() in selected]
+        else:
+            target_services = all_services
+
         pending = [
-            s for s in all_services
+            s for s in target_services
             if any(it.conflicts for it in s.perimeter_iterations)
         ]
         if pending:
             return {"saved": False, "pending_services": len(pending)}
 
         writer = build_writer()
-        written = writer.save_dictionary(all_services)
-        rejected_written = writer.save_rejected(all_services)
+        written = writer.save_dictionary(target_services)
+        rejected_written = writer.save_rejected(target_services)
 
         return {"saved": True, "services_written": written, "rejected_written": rejected_written}

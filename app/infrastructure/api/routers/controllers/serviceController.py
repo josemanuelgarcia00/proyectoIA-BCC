@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from typing import List, Literal
+from typing import List, Literal, Optional
 from app.application.serviceService import ServiceService
 from app.application.conflictResolverService import ConflictResolver
 from app.infrastructure.api.dtos.serviceOutDTO import ServiceResponseDTO, ExcelRowDataResponseDTO
@@ -34,15 +34,21 @@ def refresh_services():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/save-to-excel", summary="Volcar el resultado final al Excel de origen (hoja Diccionario)")
-def save_to_excel():
+class SaveSelectionRequest(BaseModel):
+    service_names: Optional[List[str]] = None
+
+
+@router.post("/save-to-excel", summary="Volcar a Excel los servicios seleccionados (hoja Diccionario/Desechados)")
+def save_to_excel(payload: SaveSelectionRequest = SaveSelectionRequest()):
     """
-    Si ya no quedan conflictos pendientes en ningún servicio, escribe el resultado
-    final de cada uno (última iteración, ya revisada) en la hoja Diccionario del Excel.
+    Escribe en el Excel de origen el resultado final de los servicios indicados
+    en service_names (si alguno de ellos todavía tiene conflictos pendientes, no
+    se guarda nada y se informa cuántos quedan). Si no se indica service_names,
+    se considera el catálogo completo (comportamiento anterior).
     """
     try:
         service = ServiceService()
-        result = service.save_to_excel()
+        result = service.save_to_excel(payload.service_names)
         return result
     except PermissionError:
         raise HTTPException(

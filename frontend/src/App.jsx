@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import IterationReview from './components/IterationReview';
 import DictionaryEntry from './components/DictionaryEntry';
 import RejectedEntry from './components/RejectedEntry';
+import SaveSelector from './components/SaveSelector';
 import './index.css';
 
 const VIEW_LABELS = {
   conflicts: { loading: 'pendientes', title: 'Pendientes de revisión', empty: 'No hay nada pendiente de revisión', select: 'revisar iteraciones y conflictos' },
   dictionary: { loading: 'diccionario', title: 'Diccionario completo', empty: 'El Diccionario todavía no tiene servicios', select: 'ver sus datos' },
-  rejected: { loading: 'desechados', title: 'Servicios desechados', empty: 'No hay servicios desechados', select: 'ver sus datos y moverlo a revisión' }
+  rejected: { loading: 'desechados', title: 'Servicios desechados', empty: 'No hay servicios desechados', select: 'ver sus datos y moverlo a revisión' },
+  save: { loading: 'catálogo', title: 'Guardar en Excel', empty: 'No hay servicios cargados', select: '' }
 };
 
 export default function App() {
@@ -20,7 +22,6 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortAlpha, setSortAlpha] = useState(false);
   const [toast, setToast] = useState(null);
-  const [saving, setSaving] = useState(false);
 
   const showToast = (text) => {
     setToast(text);
@@ -112,25 +113,28 @@ export default function App() {
       });
   };
 
-  const saveToExcel = () => {
-    setSaving(true);
-    fetch('/api/v1/services/save-to-excel', { method: 'POST' })
-      .then(async r => {
-        if (!r.ok) {
-          const err = await r.json().catch(() => ({}));
-          throw new Error(err.detail || `HTTP ${r.status}`);
-        }
+  const loadSaveSelection = () => {
+    setLoading(true);
+    setView('save');
+    setSearchTerm('');
+    setSortAlpha(false);
+    setSelectedService(null);
+
+    // Trae el catálogo completo (todos los estados) para poder elegir qué
+    // servicios guardar ya y cuáles dejar pendientes para otra sesión
+    fetch('/api/v1/services/')
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
       .then(data => {
-        if (data.saved) {
-          showToast(`✅ Guardado en Excel: ${data.services_written} servicio(s) volcados al Diccionario`);
-        } else {
-          showToast(`⚠️ Aún quedan ${data.pending_services} servicio(s) con conflictos sin revisar`);
-        }
+        setServices(data);
+        setLoading(false);
       })
-      .catch(e => showToast(`❌ Error al guardar: ${e.message}`))
-      .finally(() => setSaving(false));
+      .catch(e => {
+        console.error('Error cargando catálogo para guardar:', e);
+        setLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -159,99 +163,111 @@ export default function App() {
           <button className="btn-header" onClick={loadRejected}>
             Ver desechados
           </button>
-          <button className="btn-header" onClick={saveToExcel} disabled={saving}>
-            {saving ? 'Guardando...' : 'Sobrescribir diccionario final'}
+          <button className="btn-header" onClick={loadSaveSelection}>
+            Guardar en Excel
           </button>
         </div>
       </header>
 
-      <div className="panel">
-        {loading ? (
-          <div className="loading">Cargando {VIEW_LABELS[view].loading}...</div>
-        ) : services.length === 0 ? (
-          <div className="empty">{VIEW_LABELS[view].empty}</div>
-        ) : (
-          <>
-            <h2>
-              {VIEW_LABELS[view].title}
-              <span className="mono" style={{ fontSize: '13px', color: 'var(--text-muted)', textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>
-                {filteredServices.length} de {services.length}
-              </span>
-            </h2>
-
-            <div style={{ marginBottom: '16px', display: 'flex', gap: '10px' }}>
-              <input
-                type="text"
-                className="search-input"
-                placeholder="Buscar servicio por nombre..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              {view === 'dictionary' && (
-                <button
-                  className="btn-quiet"
-                  style={{ flex: 'none' }}
-                  onClick={() => setSortAlpha(prev => !prev)}
-                >
-                  {sortAlpha ? 'Orden original' : 'Ordenar A-Z'}
-                </button>
-              )}
-            </div>
-
-            {filteredServices.length === 0 ? (
-              <div className="empty" style={{ padding: '40px 20px' }}>
-                No se encontraron servicios que coincidan con "<strong>{searchTerm}</strong>"
-              </div>
+      {view === 'save' ? (
+        <div className="panel" style={{ gridColumn: '1 / -1' }}>
+          <SaveSelector
+            services={services}
+            loading={loading}
+            onSaved={(msg) => { showToast(msg); loadSaveSelection(); }}
+          />
+        </div>
+      ) : (
+        <>
+          <div className="panel">
+            {loading ? (
+              <div className="loading">Cargando {VIEW_LABELS[view].loading}...</div>
+            ) : services.length === 0 ? (
+              <div className="empty">{VIEW_LABELS[view].empty}</div>
             ) : (
-              filteredServices.map(service => (
-                <div
-                  key={service.service_name}
-                  className={`service-item ${selectedService?.service_name === service.service_name ? 'active' : ''}`}
-                  onClick={() => setSelectedService(service)}
-                >
-                  <div className="service-name">{service.service_name}</div>
-                  <div style={{ fontSize: '12px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {service.is_in_dictionary
-                      ? <span className="stamp stamp-moss">En diccionario</span>
-                      : <span className="stamp stamp-amber">Nuevo</span>}
-                    {view !== 'dictionary' && service.perimeter_iterations?.length > 0 && (
-                      <span className="mono" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                        {service.perimeter_iterations.length} iteraciones
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </>
-        )}
-      </div>
+              <>
+                <h2>
+                  {VIEW_LABELS[view].title}
+                  <span className="mono" style={{ fontSize: '13px', color: 'var(--text-muted)', textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>
+                    {filteredServices.length} de {services.length}
+                  </span>
+                </h2>
 
-      <div className="panel">
-        {selectedService ? (
-          view === 'dictionary' ? (
-            <DictionaryEntry service={selectedService} />
-          ) : view === 'rejected' ? (
-            <RejectedEntry
-              service={selectedService}
-              onRestored={(name) => {
-                setServices(prev => prev.filter(s => s.service_name !== name));
-                setSelectedService(null);
-              }}
-            />
-          ) : (
-            <IterationReview
-              service={selectedService}
-              onServiceClosed={(name) => {
-                setServices(prev => prev.filter(s => s.service_name !== name));
-                setSelectedService(null);
-              }}
-            />
-          )
-        ) : (
-          <div className="empty">Selecciona un servicio para {VIEW_LABELS[view].select}</div>
-        )}
-      </div>
+                <div style={{ marginBottom: '16px', display: 'flex', gap: '10px' }}>
+                  <input
+                    type="text"
+                    className="search-input"
+                    placeholder="Buscar servicio por nombre..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  {view === 'dictionary' && (
+                    <button
+                      className="btn-quiet"
+                      style={{ flex: 'none' }}
+                      onClick={() => setSortAlpha(prev => !prev)}
+                    >
+                      {sortAlpha ? 'Orden original' : 'Ordenar A-Z'}
+                    </button>
+                  )}
+                </div>
+
+                {filteredServices.length === 0 ? (
+                  <div className="empty" style={{ padding: '40px 20px' }}>
+                    No se encontraron servicios que coincidan con "<strong>{searchTerm}</strong>"
+                  </div>
+                ) : (
+                  filteredServices.map(service => (
+                    <div
+                      key={service.service_name}
+                      className={`service-item ${selectedService?.service_name === service.service_name ? 'active' : ''}`}
+                      onClick={() => setSelectedService(service)}
+                    >
+                      <div className="service-name">{service.service_name}</div>
+                      <div style={{ fontSize: '12px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {service.is_in_dictionary
+                          ? <span className="stamp stamp-moss">En diccionario</span>
+                          : <span className="stamp stamp-amber">Nuevo</span>}
+                        {view !== 'dictionary' && service.perimeter_iterations?.length > 0 && (
+                          <span className="mono" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                            {service.perimeter_iterations.length} iteraciones
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </>
+            )}
+          </div>
+
+          <div className="panel">
+            {selectedService ? (
+              view === 'dictionary' ? (
+                <DictionaryEntry service={selectedService} />
+              ) : view === 'rejected' ? (
+                <RejectedEntry
+                  service={selectedService}
+                  onRestored={(name) => {
+                    setServices(prev => prev.filter(s => s.service_name !== name));
+                    setSelectedService(null);
+                  }}
+                />
+              ) : (
+                <IterationReview
+                  service={selectedService}
+                  onServiceClosed={(name) => {
+                    setServices(prev => prev.filter(s => s.service_name !== name));
+                    setSelectedService(null);
+                  }}
+                />
+              )
+            ) : (
+              <div className="empty">Selecciona un servicio para {VIEW_LABELS[view].select}</div>
+            )}
+          </div>
+        </>
+      )}
 
       {toast && (
         <div style={{
