@@ -1,7 +1,6 @@
-import os
-from app.application.syncService import SyncService 
-from app.infrastructure.storage.excelReader import ExcelReader
-from app.infrastructure.persistence.serviceRepository import MongoRepository
+from app.application.syncService import SyncService
+from app.infrastructure.storage.dataSourceFactory import build_reader, get_source_label
+from app.infrastructure.persistence.serviceRepository import CatalogRepository
 from app.application.comparatorService import ComparatorService
 
 def run_seed():
@@ -9,24 +8,22 @@ def run_seed():
     Punto de entrada síncrono para la sincronización manual.
     """
     print("🚀 Iniciando proceso de sincronización...")
-    
-    # 1. Definimos las rutas
-    file_path = os.path.abspath("data/CARGA_SERVICIOS.xlsx")
-    
-    # 2. Instanciamos los adaptadores
-    reader = ExcelReader(file_path)
-    repo = MongoRepository()
+    print(f"📁 Fuente de datos: {get_source_label()}")
+
+    # 1. Instanciamos los adaptadores (Excel o Google Sheets, según DATA_SOURCE)
+    reader = build_reader()
+    repo = CatalogRepository()
     comparator = ComparatorService()
-    
-    # 3. Inyectamos las dependencias en el servicio
+
+    # 2. Inyectamos las dependencias en el servicio
     service = SyncService(
         reader=reader,
         comparator=comparator,
         repo=repo
     )
-    
+
     try:
-        # 4. Ejecutamos de forma síncrona
+        # 3. Ejecutamos de forma síncrona
         service.execute()
         print("✅ Sincronización completada con éxito.")
     except Exception as e:

@@ -1,7 +1,7 @@
 """
 SERVIDOR FASTAPI PRINCIPAL
 Gestor de conflictos entre iteraciones de servicios
-Lee datos desde data/CARGA_SERVICIOS.xlsx
+Lee datos desde Excel local o Google Sheets, según DATA_SOURCE
 """
 import uvicorn
 import os
@@ -11,6 +11,7 @@ from fastapi.responses import RedirectResponse
 
 # Importar routers
 from app.infrastructure.api.routers.controllers.serviceController import router as service_router
+from app.infrastructure.storage.dataSourceFactory import get_data_source, get_excel_path, get_source_label
 
 # Crear aplicación
 app = FastAPI(
@@ -45,19 +46,28 @@ async def health():
         "status": "healthy",
         "service": "Gestor de Conflictos",
         "version": "1.0.0",
-        "data_source": "Excel - data/CARGA_SERVICIOS.xlsx"
+        "data_source": get_source_label()
     }
 
 
 if __name__ == "__main__":
-    # Verificar si existe el archivo Excel
-    excel_path = os.path.join(os.path.dirname(__file__), "data", "CARGA_SERVICIOS.xlsx")
-    
-    if not os.path.exists(excel_path):
-        print("❌ ERROR: Archivo Excel no encontrado.")
-        print(f"📍 Se espera en: {excel_path}")
-        print("💡 Por favor, asegúrate de que CARGA_SERVICIOS.xlsx existe en la carpeta data/")
-        exit(1)
+    # Verificar que la fuente de datos configurada es accesible antes de arrancar
+    if get_data_source() == "excel":
+        excel_path = get_excel_path()
+        if not os.path.exists(excel_path):
+            print("❌ ERROR: Archivo Excel no encontrado.")
+            print(f"📍 Se espera en: {excel_path}")
+            print("💡 Por favor, asegúrate de que CARGA_SERVICIOS.xlsx existe en la carpeta data/")
+            exit(1)
+    else:
+        sheet_id = os.environ.get("GOOGLE_SHEET_ID")
+        credentials_path = os.environ.get("GOOGLE_SHEETS_CREDENTIALS_PATH", "credentials.json")
+        if not sheet_id:
+            print("❌ ERROR: DATA_SOURCE=google_sheets pero falta la variable GOOGLE_SHEET_ID.")
+            exit(1)
+        if not os.path.exists(credentials_path):
+            print(f"❌ ERROR: No se encontró el archivo de credenciales en: {credentials_path}")
+            exit(1)
     
     print("=" * 70)
     print("🚀 INICIANDO SERVIDOR - GESTOR DE CONFLICTOS")
@@ -74,7 +84,7 @@ if __name__ == "__main__":
     print("   GET  /api/v1/services/resolved - Ver diccionario resuelto")
     print("   GET  /api/v1/services/{id} - Obtener servicio por ID")
     print()
-    print(f"📁 Datos leídos desde: {excel_path}")
+    print(f"📁 Datos leídos desde: {get_source_label()}")
     print("⏹️  Presiona Ctrl+C para detener el servidor")
     print("=" * 70)
     print()

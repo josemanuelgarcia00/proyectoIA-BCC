@@ -196,9 +196,12 @@ uvicorn
 pydantic
 pandas
 openpyxl
+gspread
+google-auth
+watchdog
 ```
 
-**Nota**: Ya no es necesario MongoDB. Los datos se leen directamente desde Excel.
+**Nota**: No se usa MongoDB. Los datos se leen desde Excel local o Google Sheets, según la variable de entorno `DATA_SOURCE`.
 
 ## 🔄 Flujo de Datos
 

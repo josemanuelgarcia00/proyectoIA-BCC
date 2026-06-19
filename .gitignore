@@ -23,6 +23,12 @@ env/
 *.xlsx
 
 # ==========================================
+# Credenciales de Google Sheets (cuenta de servicio)
+# ==========================================
+credentials.json
+*-credentials.json
+
+# ==========================================
 # Configuración de Editores de Código (IDE)
 # ==========================================
 .vscode/

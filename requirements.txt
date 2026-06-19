@@ -1,6 +1,8 @@
 fastapi
 uvicorn
-motor
 pydantic
 pandas
 openpyxl
+gspread
+google-auth
+watchdog

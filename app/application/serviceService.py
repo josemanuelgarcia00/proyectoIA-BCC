@@ -1,12 +1,12 @@
-from app.infrastructure.persistence.serviceRepository import MongoRepository
+from app.infrastructure.persistence.serviceRepository import CatalogRepository
 from app.application.conflictResolverService import ConflictResolver
-from app.infrastructure.storage.excelWriter import ExcelWriter
+from app.infrastructure.storage.dataSourceFactory import build_writer
 from app.domain.service import ServiceEntity
 
 class ServiceService:
     def __init__(self):
         # El servicio asume la responsabilidad de conectar con la persistencia
-        self.repo = MongoRepository()
+        self.repo = CatalogRepository()
 
     def get_full_catalog(self):
         """
@@ -209,7 +209,7 @@ class ServiceService:
         if pending:
             return {"saved": False, "pending_services": len(pending)}
 
-        writer = ExcelWriter(self.repo.excel_path)
+        writer = build_writer()
         written = writer.save_dictionary(all_services)
         rejected_written = writer.save_rejected(all_services)
 
