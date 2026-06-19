@@ -12,6 +12,15 @@ class ServiceService:
         # (todavía no hay acceso a la API de Google Sheets para esto).
         self.audit = ExcelAuditLog(get_excel_path())
 
+    def _log_decision(self, service: ServiceEntity, accion: str, valor: str = "", iteracion="") -> None:
+        """
+        Registra la decisión junto con una foto completa (snapshot) del estado
+        ya resuelto del servicio en ese momento. La restauración tras una
+        caída/recarga usa ese snapshot directamente (ver CatalogRepository),
+        no vuelve a calcular nada, así que lo aceptado queda guardado tal cual.
+        """
+        self.audit.append(service.name, accion, valor, iteracion, service.model_dump_json())
+
     def get_full_catalog(self):
         """
         Orquesta la obtención de todo el catálogo.
@@ -95,7 +104,7 @@ class ServiceService:
         if iteration is None:
             return None
 
-        self.audit.append(service.name, "resolve_iteration", resolution, iteration_id)
+        self._log_decision(service, "resolve_iteration", resolution, iteration_id)
         return service
 
     def revert_iteration(self, item_id: str, iteration_id: int):
@@ -111,7 +120,7 @@ class ServiceService:
         if iteration is None:
             return None
 
-        self.audit.append(service.name, "revert_iteration", "", iteration_id)
+        self._log_decision(service, "revert_iteration", "", iteration_id)
         return service
 
     def reset_service_conflicts(self, item_id: str):
@@ -124,7 +133,7 @@ class ServiceService:
             return None
 
         result = ConflictResolver.reset_service(service)
-        self.audit.append(service.name, "reset_service")
+        self._log_decision(service, "reset_service")
         return result
 
     def preview_accept_merge(self, item_id: str):
@@ -153,7 +162,7 @@ class ServiceService:
         if result is None:
             return None
 
-        self.audit.append(service.name, "accept_and_close")
+        self._log_decision(service, "accept_and_close")
         return result
 
     def reject_service(self, item_id: str):
@@ -166,7 +175,7 @@ class ServiceService:
             return None
 
         result = ConflictResolver.reject_service(service)
-        self.audit.append(service.name, "reject_service")
+        self._log_decision(service, "reject_service")
         return result
 
     def revert_rejection(self, item_id: str):
@@ -179,7 +188,7 @@ class ServiceService:
             return None
 
         result = ConflictResolver.revert_rejection(service)
-        self.audit.append(service.name, "revert_rejection")
+        self._log_decision(service, "revert_rejection")
         return result
 
     def update_observations(self, item_id: str, observations: str):
@@ -192,7 +201,7 @@ class ServiceService:
             return None
 
         service.observations = observations
-        self.audit.append(service.name, "update_observations", observations)
+        self._log_decision(service, "update_observations", observations)
         return service
 
     def update_iteration_observations(self, item_id: str, iteration_id: int, observations: str):
@@ -212,7 +221,7 @@ class ServiceService:
             return None
 
         iteration.observations = observations
-        self.audit.append(service.name, "update_iteration_observations", observations, iteration_id)
+        self._log_decision(service, "update_iteration_observations", observations, iteration_id)
         return service
 
     def save_to_excel(self):

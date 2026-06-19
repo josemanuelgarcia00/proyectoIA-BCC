@@ -1,6 +1,7 @@
+import json
+
 from app.infrastructure.storage.dataSourceFactory import build_reader, get_excel_path
 from app.infrastructure.storage.auditLog import ExcelAuditLog
-from app.application.conflictResolverService import ConflictResolver
 from app.domain.service import ServiceEntity
 
 
@@ -61,48 +62,67 @@ class CatalogRepository:
 
     def _replay_audit_log(self):
         """
-        Reproduce sobre el catálogo recién cargado las decisiones registradas en
-        la hoja Auditoria, en el mismo orden en que se tomaron. Esto reconstruye
-        el estado de revisión aunque el servidor se haya reiniciado entre medias:
-        la fuente de verdad de las decisiones es esa hoja, no la caché en memoria.
+        Restaura sobre el catálogo recién cargado el último estado aceptado de
+        cada servicio, leído de la hoja Auditoria. Esto reconstruye la revisión
+        aunque el servidor se haya reiniciado entre medias: la fuente de verdad
+        de lo decidido es esa hoja (su columna 'snapshot', una foto completa y
+        ya resuelta del servicio en el momento de la decisión), no la caché en
+        memoria ni recalcular la lógica de conflictos de nuevo.
 
         Por ahora la auditoría solo existe sobre el Excel físico local (todavía
         no hay acceso a la API de Google Sheets para esto); si el archivo no
-        existe o no tiene hoja Auditoria, simplemente no hay nada que reproducir.
+        existe o no tiene hoja Auditoria, simplemente no hay nada que restaurar.
         """
         entries = ExcelAuditLog(get_excel_path()).read_all()
 
+        # Cada entrada es una foto completa del servicio en ese momento, así que
+        # solo nos interesa la última por servicio (las anteriores ya quedaron
+        # incluidas en ella).
+        latest_snapshot_by_service = {}
         for entry in entries:
-            service = self._find_in_cache(str(entry.get("servicio", "")))
-            if service is None:
+            raw_snapshot = entry.get("snapshot", "")
+            if not raw_snapshot:
+                continue
+            servicio = str(entry.get("servicio", ""))
+            try:
+                latest_snapshot_by_service[servicio] = json.loads(raw_snapshot)
+            except (TypeError, ValueError):
                 continue
 
-            accion = str(entry.get("accion", ""))
-            valor = str(entry.get("valor", ""))
-            iteracion_raw = str(entry.get("iteracion", "")).strip()
-            iteracion = int(iteracion_raw) if iteracion_raw else None
+        for servicio, snapshot_dict in latest_snapshot_by_service.items():
+            service = self._find_in_cache(servicio)
+            if service is None:
+                continue
+            self._restore_from_snapshot(service, snapshot_dict)
 
-            if accion == "resolve_iteration" and iteracion is not None:
-                ConflictResolver.resolve_iteration(service, iteracion, valor or "unify")
-            elif accion == "revert_iteration" and iteracion is not None:
-                ConflictResolver.revert_iteration(service, iteracion)
-            elif accion == "reset_service":
-                ConflictResolver.reset_service(service)
-            elif accion == "accept_and_close":
-                ConflictResolver.accept_and_close(service)
-            elif accion == "reject_service":
-                ConflictResolver.reject_service(service)
-            elif accion == "revert_rejection":
-                ConflictResolver.revert_rejection(service)
-            elif accion == "update_observations":
-                service.observations = valor
-            elif accion == "update_iteration_observations" and iteracion is not None:
-                iteration = next(
-                    (it for it in service.perimeter_iterations if it.iteration_id == iteracion),
-                    None
-                )
-                if iteration:
-                    iteration.observations = valor
+    @staticmethod
+    def _restore_from_snapshot(fresh_service: ServiceEntity, snapshot_dict: dict) -> None:
+        """
+        Aplica sobre fresh_service (recién extraído del Perímetro/Diccionario
+        actuales) los campos ya decididos guardados en snapshot_dict. Las
+        iteraciones que no estén en el snapshot (p.ej. una nueva iteración
+        añadida al Perímetro después de la última decisión) se dejan tal cual
+        se acaban de leer, sin tocar; y original_data/original_conflicts de cada
+        iteración siempre se conservan los recién leídos (son la base para
+        poder "volver atrás" contra el origen actual).
+        """
+        snapshot_service = ServiceEntity.model_validate(snapshot_dict)
+
+        fresh_service.winning_data = snapshot_service.winning_data
+        fresh_service.exists_in_dictionary = snapshot_service.exists_in_dictionary
+        fresh_service.consolidated_status = snapshot_service.consolidated_status
+        fresh_service.closed = snapshot_service.closed
+        fresh_service.observations = snapshot_service.observations
+
+        snapshot_iterations = {it.iteration_id: it for it in snapshot_service.perimeter_iterations}
+        for iteration in fresh_service.perimeter_iterations:
+            saved = snapshot_iterations.get(iteration.iteration_id)
+            if saved is None:
+                continue
+            iteration.data = saved.data
+            iteration.conflicts = saved.conflicts
+            iteration.resolution = saved.resolution
+            iteration.observations = saved.observations
 
     def _find_in_cache(self, name: str) -> ServiceEntity:
         """Busca un servicio por nombre directamente en la caché ya cargada,

@@ -3,7 +3,7 @@ from typing import List, Dict
 import pandas as pd
 
 SHEET_NAME = "Auditoria"
-COLUMNS = ["fecha_hora", "servicio", "iteracion", "accion", "valor"]
+COLUMNS = ["fecha_hora", "servicio", "iteracion", "accion", "valor", "snapshot"]
 
 
 class ExcelAuditLog:
@@ -11,8 +11,16 @@ class ExcelAuditLog:
     de origen. Es la fuente de verdad de las decisiones tomadas: en vez de
     confiar solo en la caché en memoria del catálogo (que se pierde si el
     servidor se reinicia), cada decisión se escribe aquí en el momento en que
-    se toma, y CatalogRepository la reproduce (replay) al cargar el catálogo
-    para reconstruir el mismo estado.
+    se toma, y CatalogRepository la reproduce al cargar el catálogo para
+    reconstruir el mismo estado.
+
+    'accion'/'valor' son para que el historial sea legible por una persona
+    (qué se hizo). La restauración real no recalcula nada a partir de ellos:
+    usa 'snapshot', un JSON con el estado completo y ya resuelto del servicio
+    justo después de aplicar la decisión, para que lo restaurado sea
+    exactamente lo que se aceptó, sin depender de volver a aplicar la lógica
+    de resolución de conflictos sobre los datos de origen (que podrían haber
+    cambiado entre medias).
 
     Por ahora solo existe esta variante para el archivo Excel local; cuando
     haya acceso a la API de Google Sheets se podrá añadir el equivalente para
@@ -21,7 +29,7 @@ class ExcelAuditLog:
     def __init__(self, file_path: str):
         self.file_path = file_path
 
-    def append(self, servicio: str, accion: str, valor: str = "", iteracion: str = "") -> None:
+    def append(self, servicio: str, accion: str, valor: str = "", iteracion: str = "", snapshot: str = "") -> None:
         entries = self.read_all()
         entries.append({
             "fecha_hora": datetime.now().isoformat(timespec="seconds"),
@@ -29,6 +37,7 @@ class ExcelAuditLog:
             "iteracion": str(iteracion) if iteracion != "" else "",
             "accion": accion,
             "valor": valor or "",
+            "snapshot": snapshot or "",
         })
 
         df = pd.DataFrame(entries, columns=COLUMNS)
