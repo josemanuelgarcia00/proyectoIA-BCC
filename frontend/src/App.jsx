@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react';
 import IterationReview from './components/IterationReview';
 import DictionaryEntry from './components/DictionaryEntry';
+import RejectedEntry from './components/RejectedEntry';
 import './index.css';
+
+const VIEW_LABELS = {
+  conflicts: { loading: 'pendientes', title: 'Pendientes de revisión', empty: 'No hay nada pendiente de revisión', select: 'revisar iteraciones y conflictos' },
+  dictionary: { loading: 'diccionario', title: 'Diccionario completo', empty: 'El Diccionario todavía no tiene servicios', select: 'ver sus datos' },
+  rejected: { loading: 'desechados', title: 'Servicios desechados', empty: 'No hay servicios desechados', select: 'ver sus datos y moverlo a revisión' }
+};
 
 export default function App() {
   const [services, setServices] = useState([]);
@@ -80,6 +87,31 @@ export default function App() {
       });
   };
 
+  const loadRejected = () => {
+    setLoading(true);
+    setView('rejected');
+    setSearchTerm(''); // Limpiamos el buscador al cambiar de pestaña
+    setSortAlpha(false);
+    setSelectedService(null); // Evita renderizar el detalle anterior con la vista nueva mientras carga
+
+    // Trae los servicios marcados como Desechado en esta sesión, para poder
+    // inspeccionarlos y, si procede, devolverlos a la zona de revisión
+    fetch('/api/v1/services/rejected')
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(data => {
+        setServices(data);
+        setSelectedService(null);
+        setLoading(false);
+      })
+      .catch(e => {
+        console.error('Error cargando desechados:', e);
+        setLoading(false);
+      });
+  };
+
   const saveToExcel = () => {
     setSaving(true);
     fetch('/api/v1/services/save-to-excel', { method: 'POST' })
@@ -124,6 +156,9 @@ export default function App() {
           <button className="btn-header" onClick={loadDictionary}>
             Ver diccionario completo
           </button>
+          <button className="btn-header" onClick={loadRejected}>
+            Ver desechados
+          </button>
           <button className="btn-header" onClick={saveToExcel} disabled={saving}>
             {saving ? 'Guardando...' : 'Sobrescribir diccionario final'}
           </button>
@@ -132,13 +167,13 @@ export default function App() {
 
       <div className="panel">
         {loading ? (
-          <div className="loading">Cargando {view === 'conflicts' ? 'pendientes' : 'diccionario'}...</div>
+          <div className="loading">Cargando {VIEW_LABELS[view].loading}...</div>
         ) : services.length === 0 ? (
-          <div className="empty">{view === 'conflicts' ? 'No hay nada pendiente de revisión' : 'El Diccionario todavía no tiene servicios'}</div>
+          <div className="empty">{VIEW_LABELS[view].empty}</div>
         ) : (
           <>
             <h2>
-              {view === 'conflicts' ? 'Pendientes de revisión' : 'Diccionario completo'}
+              {VIEW_LABELS[view].title}
               <span className="mono" style={{ fontSize: '13px', color: 'var(--text-muted)', textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>
                 {filteredServices.length} de {services.length}
               </span>
@@ -196,6 +231,14 @@ export default function App() {
         {selectedService ? (
           view === 'dictionary' ? (
             <DictionaryEntry service={selectedService} />
+          ) : view === 'rejected' ? (
+            <RejectedEntry
+              service={selectedService}
+              onRestored={(name) => {
+                setServices(prev => prev.filter(s => s.service_name !== name));
+                setSelectedService(null);
+              }}
+            />
           ) : (
             <IterationReview
               service={selectedService}
@@ -206,7 +249,7 @@ export default function App() {
             />
           )
         ) : (
-          <div className="empty">Selecciona un servicio para {view === 'conflicts' ? 'revisar iteraciones y conflictos' : 'ver sus datos'}</div>
+          <div className="empty">Selecciona un servicio para {VIEW_LABELS[view].select}</div>
         )}
       </div>
 

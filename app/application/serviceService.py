@@ -34,6 +34,13 @@ class ServiceService:
         """
         return self.repo.get_resolved_services()
 
+    def get_rejected_services(self):
+        """
+        Obtiene los servicios rechazados (desechados) en esta sesión, para poder
+        inspeccionarlos y, si procede, devolverlos a la zona de revisión.
+        """
+        return self.repo.get_rejected_services()
+
     def get_full_dictionary(self):
         """
         Devuelve TODO el contenido de la hoja Diccionario del Excel de origen, no
@@ -147,6 +154,17 @@ class ServiceService:
 
         return ConflictResolver.reject_service(service)
 
+    def revert_rejection(self, item_id: str):
+        """
+        Deshace el rechazo de un servicio y lo devuelve a la zona de revisión.
+        Devuelve None si no existe.
+        """
+        service = self.repo.get_by_id(item_id)
+        if not service:
+            return None
+
+        return ConflictResolver.revert_rejection(service)
+
     def update_observations(self, item_id: str, observations: str):
         """
         Guarda observaciones libres del usuario sobre un servicio.
@@ -193,5 +211,6 @@ class ServiceService:
 
         writer = ExcelWriter(self.repo.excel_path)
         written = writer.save_dictionary(all_services)
+        rejected_written = writer.save_rejected(all_services)
 
-        return {"saved": True, "services_written": written}
+        return {"saved": True, "services_written": written, "rejected_written": rejected_written}

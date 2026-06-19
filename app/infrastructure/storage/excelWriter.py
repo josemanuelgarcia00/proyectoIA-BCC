@@ -10,6 +10,8 @@ DICTIONARY_COLUMNS = [
     "documento_origen | version", "fiabilidad"
 ]
 
+REJECTED_COLUMNS = DICTIONARY_COLUMNS + ["observaciones"]
+
 
 class ExcelWriter:
     """Escribe el resultado de la revisión de conflictos en el Excel de origen"""
@@ -51,6 +53,79 @@ class ExcelWriter:
             df.to_excel(writer, sheet_name="Diccionario", index=False)
 
         return upserted
+
+    def save_rejected(self, services: List[ServiceEntity]) -> int:
+        """
+        Hace un upsert de cada servicio rechazado sobre la hoja Desechados: si el
+        servicio ya estaba desechado de una sesión anterior, se unifica en la
+        misma fila (se actualizan los datos y se acumulan las observaciones) en
+        vez de duplicarlo. Devuelve el número de servicios rechazados escritos.
+        """
+        rejected = [s for s in services if s.consolidated_status == "Desechado"]
+        if not rejected:
+            return 0
+
+        rows_by_service = self._read_existing_rejected()
+
+        for service in rejected:
+            iteration = service.perimeter_iterations[-1] if service.perimeter_iterations else None
+            data = iteration.data if iteration else service.winning_data
+            if data is None:
+                continue
+
+            previous_observations = rows_by_service.get(service.name, {}).get("observaciones", "")
+            row = self._row_from_data(service.name, data)
+            row["observaciones"] = self._merge_observations(
+                previous_observations, iteration.observations if iteration else ""
+            )
+            rows_by_service[service.name] = row
+
+        df = pd.DataFrame(rows_by_service.values(), columns=REJECTED_COLUMNS)
+
+        with pd.ExcelWriter(self.file_path, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
+            df.to_excel(writer, sheet_name="Desechados", index=False)
+
+        return len(rejected)
+
+    def _read_existing_rejected(self) -> dict:
+        """
+        Lee la hoja Desechados actual (si existe) y la indexa por nombre de
+        servicio, para poder unificar rechazos repetidos del mismo servicio en
+        vez de duplicar filas.
+        """
+        try:
+            with pd.ExcelFile(self.file_path) as xls:
+                if "Desechados" not in xls.sheet_names:
+                    return {}
+                df = pd.read_excel(xls, sheet_name="Desechados")
+        except FileNotFoundError:
+            return {}
+
+        df.columns = df.columns.str.strip()
+        df = df.fillna("")
+
+        existing = {}
+        for record in df.to_dict("records"):
+            name = str(record.get("servicio", "")).strip().upper()
+            if not name:
+                continue
+            existing[name] = {col: record.get(col, "") for col in REJECTED_COLUMNS}
+
+        return existing
+
+    @staticmethod
+    def _merge_observations(previous: str, new: str) -> str:
+        """Acumula las observaciones de sucesivos rechazos del mismo servicio,
+        sin repetir un texto ya registrado."""
+        previous = (previous or "").strip()
+        new = (new or "").strip()
+        if not new or new == previous:
+            return previous
+        if not previous:
+            return new
+        if new in previous:
+            return previous
+        return f"{previous} / {new}"
 
     def _read_existing_dictionary(self) -> dict:
         """

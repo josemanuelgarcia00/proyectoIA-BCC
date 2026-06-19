@@ -151,6 +151,17 @@ class ConflictResolver:
         return service
 
     @staticmethod
+    def revert_rejection(service: ServiceEntity) -> ServiceEntity:
+        """
+        Deshace el rechazo de un servicio y lo devuelve a la zona de revisión:
+        reabre el servicio y recalcula su estado según los conflictos pendientes
+        que le queden (o "En revision" si ya no tiene ninguno).
+        """
+        service.closed = False
+        service.consolidated_status = ConflictResolver._compute_status(service)
+        return service
+
+    @staticmethod
     def preview_final_merge(service: ServiceEntity) -> Optional[ExcelRowData]:
         """
         Calcula (sin aplicar nada) cómo quedaría el dato final para el Diccionario:

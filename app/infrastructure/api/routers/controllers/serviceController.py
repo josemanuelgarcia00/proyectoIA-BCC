@@ -85,6 +85,22 @@ def get_resolved_services():
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 
+@router.get("/rejected", response_model=List[ServiceResponseDTO], summary="Obtener servicios rechazados (desechados)")
+def get_rejected_services():
+    """Obtiene los servicios marcados como Desechado en esta sesión"""
+    try:
+        service = ServiceService()
+        rejected_entities = service.get_rejected_services()
+
+        if not rejected_entities:
+            return []
+
+        response = [ServiceResponseDTO.from_domain(entity) for entity in rejected_entities]
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+
 @router.get(
     "/dictionary/full",
     response_model=List[ServiceResponseDTO],
@@ -308,6 +324,27 @@ def reject_service(item_id: str):
     try:
         service = ServiceService()
         domain_entity = service.reject_service(item_id.upper())
+
+        if not domain_entity:
+            raise HTTPException(status_code=404, detail="Servicio no encontrado")
+
+        return ServiceResponseDTO.from_domain(domain_entity)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/{item_id}/reject/revert",
+    response_model=ServiceResponseDTO,
+    summary="Mover un servicio rechazado de vuelta a la zona de revisión"
+)
+def revert_reject_service(item_id: str):
+    """Deshace el rechazo de un servicio y lo devuelve a los pendientes de revisión"""
+    try:
+        service = ServiceService()
+        domain_entity = service.revert_rejection(item_id.upper())
 
         if not domain_entity:
             raise HTTPException(status_code=404, detail="Servicio no encontrado")

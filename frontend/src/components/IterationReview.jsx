@@ -13,8 +13,7 @@ export default function IterationReview({ service, onServiceClosed }) {
   const [toast, setToast] = useState(null);
   const [resolvingId, setResolvingId] = useState(null);
   const [previewData, setPreviewData] = useState(null);
-  const [observations, setObservations] = useState(service?.observations || '');
-  const [savingObservations, setSavingObservations] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [iterationObservations, setIterationObservations] = useState('');
   const [savingIterationObservations, setSavingIterationObservations] = useState(false);
 
@@ -23,16 +22,17 @@ export default function IterationReview({ service, onServiceClosed }) {
     setLocalService(service);
     setToast(null);
     setPreviewData(null);
-    setObservations(service?.observations || '');
   }, [service]);
 
-  // Sincroniza el cuadro de observaciones con la iteración pendiente actual
-  // (la primera con conflictos sin revisar): al pasar a la siguiente, se recarga.
+  // Sincroniza el cuadro de observaciones con la iteración que sería rechazada
+  // si se pulsa "Rechazar": la primera con conflictos sin revisar, o si ya no
+  // quedan conflictos pendientes, la última iteración (la que se rechazaría
+  // por completo al rechazar el servicio).
   useEffect(() => {
-    const pending = (localService?.perimeter_iterations || []).filter(
-      it => it.conflicts && it.conflicts.length > 0
-    );
-    setIterationObservations(pending[0]?.observations || '');
+    const iterations = localService?.perimeter_iterations || [];
+    const pending = iterations.filter(it => it.conflicts && it.conflicts.length > 0);
+    const target = pending[0] || iterations[iterations.length - 1] || null;
+    setIterationObservations(target?.observations || '');
   }, [localService]);
 
   if (!localService || !localService.perimeter_iterations) {
@@ -167,12 +167,17 @@ export default function IterationReview({ service, onServiceClosed }) {
     }
   };
 
-  const rejectService = async () => {
-    const confirmed = window.confirm(
-      `¿Seguro que quieres rechazar "${localService.service_name}"? No se incorporará al Diccionario.`
-    );
-    if (!confirmed) return;
+  const rejectService = () => {
+    setConfirmDialog({
+      title: 'Rechazar servicio',
+      message: `¿Seguro que quieres rechazar "${localService.service_name}"? No se incorporará al Diccionario.`,
+      confirmLabel: 'Rechazar',
+      onConfirm: performRejectService
+    });
+  };
 
+  const performRejectService = async () => {
+    setConfirmDialog(null);
     setResolvingId('reject-service');
     try {
       const res = await fetch(
@@ -191,33 +196,6 @@ export default function IterationReview({ service, onServiceClosed }) {
       showToast(`❌ ${e.message}`);
     } finally {
       setResolvingId(null);
-    }
-  };
-
-  const saveObservations = async () => {
-    setSavingObservations(true);
-    try {
-      const res = await fetch(
-        `/api/v1/services/${encodeURIComponent(localService.service_name)}/observations`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ observations })
-        }
-      );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || 'No se pudieron guardar las observaciones');
-      }
-
-      const updated = await res.json();
-      setLocalService(updated);
-      showToast('📝 Observaciones guardadas');
-    } catch (e) {
-      showToast(`❌ ${e.message}`);
-    } finally {
-      setSavingObservations(false);
     }
   };
 
@@ -253,10 +231,12 @@ export default function IterationReview({ service, onServiceClosed }) {
     it => it.conflicts && it.conflicts.length > 0
   );
 
-  // Última iteración = dato consolidado que pasaría al Diccionario una vez revisado todo
-  const finalData = localService.perimeter_iterations.length > 0
-    ? localService.perimeter_iterations[localService.perimeter_iterations.length - 1].data
+  // Última iteración = dato consolidado que pasaría al Diccionario una vez revisado
+  // todo, y también la iteración que se rechazaría por completo si se rechaza el servicio
+  const lastIteration = localService.perimeter_iterations.length > 0
+    ? localService.perimeter_iterations[localService.perimeter_iterations.length - 1]
     : null;
+  const finalData = lastIteration?.data || null;
 
   // Cuando ya no quedan conflictos pendientes, mostramos diccionario y resultado final lado a lado
   const allResolved = localService.perimeter_iterations.length > 0 && visibleIterations.length === 0;
@@ -284,6 +264,34 @@ export default function IterationReview({ service, onServiceClosed }) {
   };
 
   const statusStampClass = STATUS_STAMP[localService.status] || 'stamp-ink';
+
+  // Cuadro de observaciones ligado siempre a una iteración concreta (la que se
+  // rechazaría si se pulsa "Rechazar"), nunca a una nota genérica del servicio
+  const iterationObservationsBox = (iterationId) => (
+    <div className="note-block" style={{ marginTop: '16px' }}>
+      <h4 className="subhead" style={{ marginBottom: '8px' }}>Observaciones de esta iteración</h4>
+      <textarea
+        value={iterationObservations}
+        onChange={(e) => setIterationObservations(e.target.value)}
+        placeholder="Notas sobre esta iteración, p. ej. el motivo si se va a rechazar (opcional)..."
+        rows={2}
+        style={{
+          width: '100%', padding: '8px', borderRadius: '2px',
+          border: '1px solid var(--rule)', fontSize: '13px',
+          fontFamily: 'inherit', resize: 'vertical'
+        }}
+      />
+      <div style={{ marginTop: '8px', textAlign: 'right' }}>
+        <button
+          className="btn-quiet"
+          disabled={savingIterationObservations}
+          onClick={() => saveIterationObservations(iterationId)}
+        >
+          {savingIterationObservations ? 'Guardando...' : 'Guardar observaciones'}
+        </button>
+      </div>
+    </div>
+  );
 
   // Solo se usa cuando el servicio SÍ existe en el Diccionario (si es nuevo, se
   // muestra en su lugar el aviso de una sola línea más abajo en el render)
@@ -362,6 +370,8 @@ export default function IterationReview({ service, onServiceClosed }) {
           {resolvingId === 'reject-service' ? 'Aplicando...' : 'Rechazar servicio'}
         </button>
       </div>
+
+      {lastIteration && iterationObservationsBox(lastIteration.iteration_id)}
     </div>
   );
 
@@ -406,32 +416,8 @@ export default function IterationReview({ service, onServiceClosed }) {
           {resolvingId === 'reject-service' ? 'Aplicando...' : 'Rechazar'}
         </button>
       </div>
-    </div>
-  );
 
-  const observationsBox = (
-    <div className="note-block" style={{ marginBottom: '24px' }}>
-      <h4 className="subhead">Observaciones</h4>
-      <textarea
-        value={observations}
-        onChange={(e) => setObservations(e.target.value)}
-        placeholder="Añade aquí cualquier nota u observación sobre este servicio (opcional)..."
-        rows={3}
-        style={{
-          width: '100%', padding: '10px', borderRadius: '2px',
-          border: '1px solid var(--rule)', fontSize: '13px',
-          fontFamily: 'inherit', resize: 'vertical'
-        }}
-      />
-      <div style={{ marginTop: '10px', textAlign: 'right' }}>
-        <button
-          className="btn-quiet"
-          disabled={savingObservations}
-          onClick={saveObservations}
-        >
-          {savingObservations ? 'Guardando...' : 'Guardar observaciones'}
-        </button>
-      </div>
+      {lastIteration && iterationObservationsBox(lastIteration.iteration_id)}
     </div>
   );
 
@@ -548,30 +534,7 @@ export default function IterationReview({ service, onServiceClosed }) {
                 </div>
               </div>
 
-            {/* Observaciones propias de esta iteración */}
-            <div className="note-block" style={{ marginTop: '16px' }}>
-              <h4 className="subhead" style={{ marginBottom: '8px' }}>Observaciones de esta iteración</h4>
-              <textarea
-                value={iterationObservations}
-                onChange={(e) => setIterationObservations(e.target.value)}
-                placeholder="Notas sobre esta iteración (opcional)..."
-                rows={2}
-                style={{
-                  width: '100%', padding: '8px', borderRadius: '2px',
-                  border: '1px solid var(--rule)', fontSize: '13px',
-                  fontFamily: 'inherit', resize: 'vertical'
-                }}
-              />
-              <div style={{ marginTop: '8px', textAlign: 'right' }}>
-                <button
-                  className="btn-quiet"
-                  disabled={savingIterationObservations}
-                  onClick={() => saveIterationObservations(currentIteration.iteration_id)}
-                >
-                  {savingIterationObservations ? 'Guardando...' : 'Guardar observaciones'}
-                </button>
-              </div>
-            </div>
+            {iterationObservationsBox(currentIteration.iteration_id)}
 
             </div>
           )}
@@ -608,8 +571,6 @@ export default function IterationReview({ service, onServiceClosed }) {
           })}
         </div>
       )}
-
-      {isNewService && <div style={{ marginTop: '20px' }}>{observationsBox}</div>}
 
       </div>
 
@@ -663,6 +624,40 @@ export default function IterationReview({ service, onServiceClosed }) {
                 style={{ flex: 1, textAlign: 'center' }}
                 disabled={resolvingId === 'accept-close'}
                 onClick={() => setPreviewData(null)}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDialog && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(21,48,47,0.55)', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', zIndex: 2100, padding: '20px'
+        }}>
+          <div style={{
+            background: 'white', borderRadius: '4px', padding: '24px',
+            maxWidth: '440px', width: '100%',
+            border: '1px solid var(--rule)'
+          }}>
+            <h3 style={{ color: 'var(--ink)', marginBottom: '10px', fontSize: '15px', fontWeight: 600 }}>
+              {confirmDialog.title}
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '20px' }}>
+              {confirmDialog.message}
+            </p>
+
+            <div className="buttons">
+              <button className="btn-reject" onClick={confirmDialog.onConfirm}>
+                {confirmDialog.confirmLabel || 'Confirmar'}
+              </button>
+              <button
+                className="btn-quiet"
+                style={{ flex: 1, textAlign: 'center' }}
+                onClick={() => setConfirmDialog(null)}
               >
                 Cancelar
               </button>

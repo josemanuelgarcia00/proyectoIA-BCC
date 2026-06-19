@@ -138,6 +138,13 @@ class MongoRepository:
             ))
         ]
 
+    def get_rejected_services(self) -> list:
+        """Retorna servicios marcados como Desechado (rechazados) en esta sesión"""
+        if not self.services_cache:
+            return []
+
+        return [s for s in self.services_cache if s.consolidated_status == "Desechado"]
+
     def get_dictionary_rows(self) -> dict:
         """
         Devuelve el índice {nombre_servicio: datos} de la hoja Diccionario completa
