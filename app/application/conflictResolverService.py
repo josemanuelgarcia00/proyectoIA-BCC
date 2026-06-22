@@ -142,12 +142,24 @@ class ConflictResolver:
     @staticmethod
     def reject_service(service: ServiceEntity) -> ServiceEntity:
         """
-        Rechaza el servicio por completo (p.ej. un servicio nuevo que no se quiere
-        incorporar al Diccionario). No se borra ningún dato, solo se marca como
-        descartado y se cierra para que deje de aparecer entre los pendientes.
+        Rechaza la propuesta pendiente del Perímetro para este servicio. No se
+        borra ningún dato, solo se cierra para que deje de aparecer entre los
+        pendientes.
+
+        El significado de "rechazar" depende de si el servicio ya existía en
+        el Diccionario:
+        - Si es nuevo (no existía), rechazarlo significa no incorporarlo: se
+          marca "Desechado" para que se archive en la hoja Desechados.
+        - Si ya existía en el Diccionario, rechazar la propuesta nueva NO debe
+          desechar el dato maestro ya aceptado: se cierra como "Aceptado" (sin
+          cambios), para no marcar como descartado algo que sigue vigente en
+          el Diccionario.
         """
         service.closed = True
-        service.consolidated_status = "Desechado"
+        if service.exists_in_dictionary == "Si":
+            service.consolidated_status = "Aceptado"
+        else:
+            service.consolidated_status = "Desechado"
         return service
 
     @staticmethod

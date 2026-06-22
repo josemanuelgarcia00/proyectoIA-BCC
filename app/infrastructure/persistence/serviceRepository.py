@@ -126,7 +126,16 @@ class CatalogRepository:
             service = self._find_in_cache(servicio)
             if service is None:
                 continue
-            self._restore_from_snapshot(service, snapshot_dict)
+            try:
+                self._restore_from_snapshot(service, snapshot_dict)
+            except Exception as e:
+                # Un snapshot suelto que ya no valide (p.ej. quedó grabado con
+                # un esquema de ServiceEntity más antiguo) no puede tirar abajo
+                # la restauración del resto de servicios: antes, una excepción
+                # aquí interrumpía todo el bucle y dejaba sin restaurar a todos
+                # los que quedaban por procesar después de este (parecía que
+                # "desaparecían" servicios ya aceptados tras reiniciar/recargar).
+                print(f"⚠️ No se pudo restaurar la auditoría de '{servicio}', se omite: {e}")
 
     @staticmethod
     def _restore_from_snapshot(fresh_service: ServiceEntity, snapshot_dict: dict) -> None:
@@ -146,6 +155,16 @@ class CatalogRepository:
         fresh_service.consolidated_status = snapshot_service.consolidated_status
         fresh_service.closed = snapshot_service.closed
         fresh_service.observations = snapshot_service.observations
+
+        # Autocorrección de un bug ya arreglado en ConflictResolver.reject_service:
+        # versiones anteriores marcaban "Desechado" también al rechazar la
+        # propuesta nueva de un servicio que YA existía en el Diccionario (debía
+        # quedar "Aceptado", sin tocar el dato maestro). Esas decisiones quedaron
+        # grabadas tal cual en la Auditoria; como el snapshot es la fuente de
+        # verdad y se reaplica en cada carga, sin esto el dato viejo seguiría
+        # pisando el cálculo ya corregido para siempre.
+        if fresh_service.consolidated_status == "Desechado" and fresh_service.exists_in_dictionary == "Si":
+            fresh_service.consolidated_status = "Aceptado"
 
         snapshot_iterations = {it.iteration_id: it for it in snapshot_service.perimeter_iterations}
         for iteration in fresh_service.perimeter_iterations:
