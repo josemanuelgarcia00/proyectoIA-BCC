@@ -45,7 +45,6 @@ La aplicación estará disponible en: `http://localhost:8000`
 ```
 ProyectoIA/
 ├── main.py                          # Servidor FastAPI principal
-├── generate_excel.py                # Generador de archivo Excel de ejemplo
 ├── servicios.xlsx                   # Archivo Excel con datos (auto-generado)
 ├── requirements.txt                 # Dependencias del proyecto
 ├── app/
@@ -174,13 +173,11 @@ ProyectoIA/
 - Asegúrate de que `servicios.xlsx` existe en la raíz del proyecto
 
 ### Error: "Archivo Excel no encontrado"
-- El sistema generará automáticamente un archivo de ejemplo al iniciar
-- O ejecuta: `python generate_excel.py` para crear uno manualmente
+- Verifica la ruta configurada en `EXCEL_PATH` (o `DATA_SOURCE=google_sheets`)
 
 ### El Excel no se lee correctamente
 - Verifica que el Excel tenga las hojas: "Diccionario" y "Perímetro"
 - Los nombres de columnas deben estar en la primera fila
-- Asegúrate de que la estructura coincida con el archivo generado
 
 ### Puerto 8000 en uso
 - Cambia el puerto en `main.py`:
@@ -198,7 +195,6 @@ pandas
 openpyxl
 gspread
 google-auth
-watchdog
 ```
 
 **Nota**: No se usa MongoDB. Los datos se leen desde Excel local o Google Sheets, según la variable de entorno `DATA_SOURCE`.

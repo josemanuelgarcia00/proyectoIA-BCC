@@ -226,10 +226,6 @@ class CatalogRepository:
 
         return False
 
-    def save_reconciled_services(self, reconciled_docs):
-        """Guarda los servicios reconciliados (en la fuente de origen)"""
-        print(f"💾 Se guardarían {len(reconciled_docs)} servicios reconciliados")
-
     def get_all(self) -> list:
         """
         Devuelve todos los servicios cargados desde la fuente de origen. Antes
