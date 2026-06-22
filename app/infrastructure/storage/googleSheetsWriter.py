@@ -76,7 +76,7 @@ class GoogleSheetsWriter:
     def _read_existing_dictionary(self) -> dict:
         try:
             reader = GoogleSheetsReader(self.sheet_id, self.credentials_path)
-            dictionary_records, _ = reader.read_excel_sheets()
+            dictionary_records = reader.read_dictionary_sheet()
         except ValueError:
             return {}
 

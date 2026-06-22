@@ -47,13 +47,16 @@ class CatalogRepository:
         self._last_checked_at = time.monotonic()
         self._initialized = True
 
-    def _load_services(self):
+    def _load_services(self, dictionary_records=None, perimeter_records=None):
         """Carga los servicios y el índice del Diccionario desde la fuente configurada,
         en una sola pasada por los datos (una sola lectura de la fuente: en Google
         Sheets cada lectura es una llamada a la API, así que evitamos repetirla
-        para no agotar la cuota)."""
+        para no agotar la cuota). Si quien llama ya leyó los registros (p.ej.
+        refresh_if_source_changed calculando la firma), se le pueden pasar aquí
+        para no volver a leer la fuente una segunda vez."""
         try:
-            dictionary_records, perimeter_records = self.reader.read_excel_sheets()
+            if dictionary_records is None or perimeter_records is None:
+                dictionary_records, perimeter_records = self.reader.read_excel_sheets()
             self.dictionary_cache = self.reader._build_dictionary_index(dictionary_records)
             self.services_cache = self.reader.extract_services_from_records(
                 dictionary_records, perimeter_records
@@ -209,7 +212,8 @@ class CatalogRepository:
         self._last_checked_at = now
 
         try:
-            new_signature = self.reader.get_signature()
+            dictionary_records, perimeter_records = self.reader.read_excel_sheets()
+            new_signature = self.reader.get_signature(dictionary_records, perimeter_records)
         except Exception:
             # Si nunca hubo una carga exitosa (p.ej. la inicial falló por un
             # límite temporal de la API), no nos quedamos atascados para
@@ -221,7 +225,9 @@ class CatalogRepository:
 
         if self._source_signature is None or new_signature != self._source_signature:
             print("🔄 Cambio detectado en la fuente de origen, recargando catálogo...")
-            self._load_services()
+            # Ya se leyeron los registros para calcular la firma: se reutilizan
+            # aquí en vez de volver a leer la fuente por segunda vez.
+            self._load_services(dictionary_records, perimeter_records)
             return True
 
         return False

@@ -28,6 +28,20 @@ class GoogleSheetsReader(SheetDataParser):
 
         return dictionary_records, perimeter_records
 
+    def read_dictionary_sheet(self):
+        """Lee solo la hoja 'Diccionario', sin pedir también 'Perímetro' (a
+        diferencia de read_excel_sheets): cada hoja leída es una llamada
+        aparte a la API, así que cuando solo hace falta el Diccionario (p.ej.
+        para comprobar qué hay ya guardado antes de escribir) no tiene sentido
+        gastar una llamada extra leyendo el Perímetro."""
+        spreadsheet = open_spreadsheet(self.sheet_id, self.credentials_path)
+        try:
+            dic_ws = spreadsheet.worksheet("Diccionario")
+        except Exception as exc:
+            raise ValueError("El Google Sheet debe contener la hoja 'Diccionario'") from exc
+
+        return self._clean_records(dic_ws.get_all_records())
+
     def get_signature(self, dictionary_records=None, perimeter_records=None):
         """Google Sheets no expone una 'fecha de modificación' barata sin la
         API de Drive, así que la firma de cambio es un hash del contenido.
