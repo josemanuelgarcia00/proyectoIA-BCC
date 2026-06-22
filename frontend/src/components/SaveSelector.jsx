@@ -4,7 +4,12 @@ export default function SaveSelector({ services, loading, onSaved }) {
   const [selected, setSelected] = useState(new Set());
   const [saving, setSaving] = useState(false);
 
-  const eligible = services.filter(s => !s.requires_attention);
+  // Elegible = el usuario tomó una decisión explícita sobre él (aceptar y
+  // cerrar, o rechazar) y ya no tiene conflictos. No basta con "sin
+  // conflictos": un servicio nuevo o sin cambios puede quedar "Aceptado" por
+  // defecto sin que nadie lo haya confirmado, y eso no debería guardarse.
+  const isEligible = (s) => s.closed && !s.requires_attention;
+  const eligible = services.filter(isEligible);
 
   // Cada vez que se recarga el catálogo (al entrar a la pestaña o tras guardar),
   // partimos de "todo lo listo seleccionado" para no obligar a marcar uno a uno;
@@ -38,7 +43,7 @@ export default function SaveSelector({ services, loading, onSaved }) {
       })
       .then(data => {
         if (data.saved) {
-          onSaved(`✅ Guardado en Excel: ${data.services_written} servicio(s) al Diccionario, ${data.rejected_written} a Desechados`);
+          onSaved(`✅ Guardado en Excel: ${data.services_written} servicio(s) al Diccionario, ${data.rejected_written} a Desechados (${data.perimeter_rows_archived} fila(s) archivadas del Perímetro)`);
         } else {
           onSaved(`⚠️ ${data.pending_services} de los seleccionados todavía tienen conflictos sin revisar`);
         }
@@ -65,8 +70,9 @@ export default function SaveSelector({ services, loading, onSaved }) {
       </h2>
 
       <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '16px' }}>
-        Solo los servicios sin conflictos pendientes se pueden guardar (los demás aparecen deshabilitados).
-        No es necesario terminar de revisar todo el catálogo: lo que no selecciones se queda pendiente para una próxima vez.
+        Solo se pueden guardar los servicios ya confirmados (aceptados y cerrados, o rechazados) y sin conflictos pendientes
+        (los demás aparecen deshabilitados). No es necesario terminar de revisar todo el catálogo: lo que no selecciones se
+        queda pendiente para una próxima vez.
       </p>
 
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
@@ -87,33 +93,40 @@ export default function SaveSelector({ services, loading, onSaved }) {
       </div>
 
       <div>
-        {services.map(s => (
-          <label
-            key={s.service_name}
-            className="service-item"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              cursor: s.requires_attention ? 'not-allowed' : 'pointer',
-              opacity: s.requires_attention ? 0.5 : 1
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={selected.has(s.service_name)}
-              disabled={s.requires_attention}
-              onChange={() => toggle(s.service_name)}
-              style={{ width: '16px', height: '16px', flex: 'none' }}
-            />
-            <div style={{ flex: 1 }}>
-              <div className="service-name" style={{ marginBottom: '2px' }}>{s.service_name}</div>
-              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                {s.status}{s.requires_attention ? ' · tiene conflictos pendientes' : ''}
+        {services.map(s => {
+          const eligibleRow = isEligible(s);
+          const reason = s.requires_attention
+            ? ' · tiene conflictos pendientes'
+            : (!s.closed ? ' · aún no se ha aceptado ni rechazado' : '');
+
+          return (
+            <label
+              key={s.service_name}
+              className="service-item"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                cursor: eligibleRow ? 'pointer' : 'not-allowed',
+                opacity: eligibleRow ? 1 : 0.5
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={selected.has(s.service_name)}
+                disabled={!eligibleRow}
+                onChange={() => toggle(s.service_name)}
+                style={{ width: '16px', height: '16px', flex: 'none' }}
+              />
+              <div style={{ flex: 1 }}>
+                <div className="service-name" style={{ marginBottom: '2px' }}>{s.service_name}</div>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                  {s.status}{reason}
+                </div>
               </div>
-            </div>
-          </label>
-        ))}
+            </label>
+          );
+        })}
       </div>
     </div>
   );

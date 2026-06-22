@@ -28,12 +28,14 @@ class GoogleSheetsReader(SheetDataParser):
 
         return dictionary_records, perimeter_records
 
-    def get_signature(self):
+    def get_signature(self, dictionary_records=None, perimeter_records=None):
         """Google Sheets no expone una 'fecha de modificación' barata sin la
-        API de Drive, así que la firma de cambio es un hash del contenido
-        leído (a diferencia de Excel, aquí siempre implica una llamada a la
-        API, pero el volumen de uso de esta app lo hace aceptable)."""
-        dictionary_records, perimeter_records = self.read_excel_sheets()
+        API de Drive, así que la firma de cambio es un hash del contenido.
+        Si quien llama ya leyó los registros (p.ej. justo después de
+        read_excel_sheets()), se le pueden pasar aquí para no gastar otra
+        llamada a la API solo para calcular la firma."""
+        if dictionary_records is None or perimeter_records is None:
+            dictionary_records, perimeter_records = self.read_excel_sheets()
         digest_input = repr(dictionary_records) + repr(perimeter_records)
         return hashlib.sha256(digest_input.encode("utf-8")).hexdigest()
 

@@ -2,8 +2,10 @@ import os
 
 from app.infrastructure.storage.excelReader import ExcelReader
 from app.infrastructure.storage.excelWriter import ExcelWriter
+from app.infrastructure.storage.auditLog import ExcelAuditLog
 from app.infrastructure.storage.googleSheetsReader import GoogleSheetsReader
 from app.infrastructure.storage.googleSheetsWriter import GoogleSheetsWriter
+from app.infrastructure.storage.googleSheetsAuditLog import GoogleSheetsAuditLog
 
 DEFAULT_EXCEL_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "CARGA_SERVICIOS.xlsx")
 
@@ -49,3 +51,11 @@ def build_writer():
         sheet_id, credentials_path = _get_google_sheets_config()
         return GoogleSheetsWriter(sheet_id, credentials_path)
     return ExcelWriter(get_excel_path())
+
+
+def build_audit_log():
+    """Crea el registro de auditoría (Excel o Google Sheets) según DATA_SOURCE."""
+    if get_data_source() == "google_sheets":
+        sheet_id, credentials_path = _get_google_sheets_config()
+        return GoogleSheetsAuditLog(sheet_id, credentials_path)
+    return ExcelAuditLog(get_excel_path())

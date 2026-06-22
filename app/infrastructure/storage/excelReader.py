@@ -38,7 +38,9 @@ class ExcelReader(SheetDataParser):
         # Convertimos a formato lista de diccionarios
         return dic_df.to_dict('records'), per_df.to_dict('records')
 
-    def get_signature(self):
+    def get_signature(self, dictionary_records=None, perimeter_records=None):
         """Firma barata para detectar cambios sin releer ni parsear el archivo
-        (la fecha de modificación del archivo en disco)."""
+        (la fecha de modificación del archivo en disco). Los parámetros existen
+        solo para tener la misma interfaz que GoogleSheetsReader.get_signature;
+        aquí no se usan, mtime ya es suficientemente barato por sí solo."""
         return os.path.getmtime(self.file_path)

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Dict
+from typing import List, Dict, Iterable
 import pandas as pd
 
 SHEET_NAME = "Auditoria"
@@ -22,9 +22,9 @@ class ExcelAuditLog:
     de resolución de conflictos sobre los datos de origen (que podrían haber
     cambiado entre medias).
 
-    Por ahora solo existe esta variante para el archivo Excel local; cuando
-    haya acceso a la API de Google Sheets se podrá añadir el equivalente para
-    esa fuente."""
+    Variante para el archivo Excel local; ver GoogleSheetsAuditLog para la
+    misma interfaz sobre Google Sheets (la fuente activa la elige
+    dataSourceFactory.build_audit_log() según DATA_SOURCE)."""
 
     def __init__(self, file_path: str):
         self.file_path = file_path
@@ -39,6 +39,31 @@ class ExcelAuditLog:
             "valor": valor or "",
             "snapshot": snapshot or "",
         })
+
+        df = pd.DataFrame(entries, columns=COLUMNS)
+        with pd.ExcelWriter(self.file_path, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
+            df.to_excel(writer, sheet_name=SHEET_NAME, index=False)
+
+    def remove_for_services(self, servicios: Iterable[str]) -> None:
+        """
+        Borra del historial las entradas de los servicios indicados. Se usa
+        cuando un servicio ya se volcó a la hoja Diccionario/Desechados: su
+        dato final ya quedó fijado ahí, así que no hace falta seguir
+        reproduciendo su historial de decisiones en cada carga.
+
+        Nota: esto solo evita que reaparezca mientras la caché en memoria no
+        se recargue desde cero (ver CatalogRepository.remove_from_cache). Si
+        el servidor se reinicia, sus filas en Perímetro se volverán a comparar
+        contra el Diccionario sin el historial que las resolvía.
+        """
+        names = {str(s).upper() for s in servicios}
+        if not names:
+            return
+
+        current = self.read_all()
+        entries = [e for e in current if str(e.get("servicio", "")).upper() not in names]
+        if len(entries) == len(current):
+            return  # Nada que borrar (ninguno tenía entradas en la auditoría)
 
         df = pd.DataFrame(entries, columns=COLUMNS)
         with pd.ExcelWriter(self.file_path, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:

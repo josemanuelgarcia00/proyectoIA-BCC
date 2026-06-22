@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 import pandas as pd
 from typing import List
 from app.domain.service import ServiceEntity
@@ -6,6 +7,9 @@ from app.infrastructure.storage.excelReader import ExcelReader
 from app.infrastructure.storage.sheetRowFormat import (
     DICTIONARY_COLUMNS, REJECTED_COLUMNS, row_from_data, merge_observations
 )
+
+PERIMETER_HISTORY_SHEET = "Perímetro_Historico"
+PERIMETER_SHEET = "Perímetro"
 
 
 class ExcelWriter:
@@ -31,6 +35,12 @@ class ExcelWriter:
             if not service.perimeter_iterations:
                 continue
             if any(it.conflicts for it in service.perimeter_iterations):
+                continue
+            if not service.closed:
+                # Sin conflictos no implica "decidido": un servicio nuevo o sin
+                # cambios puede quedar en "Aceptado" por defecto sin que el
+                # usuario lo haya confirmado explícitamente (aceptar/rechazar).
+                # Solo se guarda lo que de verdad se cerró.
                 continue
 
             # Si el servicio fue cerrado ("Aceptar Cambios"), winning_data ya es el
@@ -81,6 +91,73 @@ class ExcelWriter:
             df.to_excel(writer, sheet_name="Desechados", index=False)
 
         return len(rejected)
+
+    def archive_perimeter_rows(self, service_names: List[str]) -> int:
+        """
+        Mueve las filas del Perímetro de los servicios indicados a la hoja
+        'Perímetro_Historico' (no se borran, se conservan tal cual se
+        propusieron, con la fecha de archivado). Una vez que el dato final de
+        un servicio ya quedó fijado en Diccionario/Desechados, sus filas de
+        Perímetro ya cumplieron su función: sacarlas de la hoja activa evita
+        que se vuelvan a comparar contra el Diccionario en cada carga (y, a
+        diferencia de solo limpiar la caché en memoria, esto es permanente:
+        aunque el servidor se reinicie, no reaparecen).
+        Devuelve el número de filas archivadas.
+        """
+        names = {n.upper() for n in service_names}
+        if not names:
+            return 0
+
+        try:
+            with pd.ExcelFile(self.file_path) as xls:
+                if PERIMETER_SHEET not in xls.sheet_names:
+                    return 0
+                per_df = pd.read_excel(xls, sheet_name=PERIMETER_SHEET)
+        except FileNotFoundError:
+            return 0
+
+        per_df.columns = per_df.columns.str.strip()
+        per_df = per_df.fillna("")
+        if per_df.empty:
+            return 0
+
+        key_col = per_df.columns[0]
+
+        def clean_name(raw) -> str:
+            return re.sub(r'\s\(\d+\)$', '', str(raw).strip()).strip().upper()
+
+        is_archived = per_df[key_col].apply(lambda v: clean_name(v) in names)
+        to_archive = per_df[is_archived].copy()
+        to_keep = per_df[~is_archived]
+
+        if to_archive.empty:
+            return 0
+
+        to_archive["fecha_archivado"] = datetime.now().isoformat(timespec="seconds")
+
+        existing_history = self._read_perimeter_history()
+        combined_history = (
+            pd.concat([existing_history, to_archive], ignore_index=True)
+            if existing_history is not None else to_archive
+        )
+
+        with pd.ExcelWriter(self.file_path, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
+            to_keep.to_excel(writer, sheet_name=PERIMETER_SHEET, index=False)
+            combined_history.to_excel(writer, sheet_name=PERIMETER_HISTORY_SHEET, index=False)
+
+        return len(to_archive)
+
+    def _read_perimeter_history(self):
+        try:
+            with pd.ExcelFile(self.file_path) as xls:
+                if PERIMETER_HISTORY_SHEET not in xls.sheet_names:
+                    return None
+                df = pd.read_excel(xls, sheet_name=PERIMETER_HISTORY_SHEET)
+        except FileNotFoundError:
+            return None
+
+        df.columns = df.columns.str.strip()
+        return df.fillna("")
 
     def _read_existing_rejected(self) -> dict:
         """

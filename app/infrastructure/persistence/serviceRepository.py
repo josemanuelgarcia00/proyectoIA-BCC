@@ -1,7 +1,7 @@
 import json
+import time
 
-from app.infrastructure.storage.dataSourceFactory import build_reader, get_excel_path
-from app.infrastructure.storage.auditLog import ExcelAuditLog
+from app.infrastructure.storage.dataSourceFactory import build_reader, build_audit_log
 from app.domain.service import ServiceEntity
 
 
@@ -15,6 +15,14 @@ class CatalogRepository:
     """
 
     _instance = None
+
+    # En Google Sheets, comprobar "¿cambió algo?" cuesta una llamada a la API
+    # igual que una recarga completa (no hay un mtime barato como en Excel).
+    # Para que navegar por la web no dispare una llamada a la API en cada
+    # clic, espaciamos esa comprobación como mínimo este número de segundos;
+    # mientras tanto se sirve la caché tal cual. Un cambio hecho fuera de la
+    # app (editando el Sheet a mano) puede tardar hasta este margen en notarse.
+    MIN_CHECK_INTERVAL_SECONDS = 15
 
     def __new__(cls, reader=None):
         if cls._instance is None:
@@ -31,18 +39,30 @@ class CatalogRepository:
         self.services_cache = None
         self.dictionary_cache = None
         self._source_signature = None
+        # Nombres de servicios ya guardados (ver remove_from_cache) que no deben
+        # reaparecer en el catálogo activo mientras dure este proceso, aunque
+        # sus filas en Perímetro sigan ahí y el catálogo se recargue de nuevo.
+        self._excluded_from_catalog = set()
         self._load_services()
+        self._last_checked_at = time.monotonic()
         self._initialized = True
 
     def _load_services(self):
         """Carga los servicios y el índice del Diccionario desde la fuente configurada,
-        en una sola pasada por los datos"""
+        en una sola pasada por los datos (una sola lectura de la fuente: en Google
+        Sheets cada lectura es una llamada a la API, así que evitamos repetirla
+        para no agotar la cuota)."""
         try:
-            dictionary_records, _ = self.reader.read_excel_sheets()
+            dictionary_records, perimeter_records = self.reader.read_excel_sheets()
             self.dictionary_cache = self.reader._build_dictionary_index(dictionary_records)
-            self.services_cache = self.reader.extract_services_from_perimeter()
-            self._source_signature = self.reader.get_signature()
-            self._replay_audit_log()
+            self.services_cache = self.reader.extract_services_from_records(
+                dictionary_records, perimeter_records
+            )
+            if self._excluded_from_catalog:
+                self.services_cache = [
+                    s for s in self.services_cache if s.name.upper() not in self._excluded_from_catalog
+                ]
+            self._source_signature = self.reader.get_signature(dictionary_records, perimeter_records)
             print(f"✅ Se cargaron {len(self.services_cache)} servicios")
 
             # Mostrar resumen de conflictos
@@ -55,10 +75,20 @@ class CatalogRepository:
             print(f"⚠️ Fuente de datos no encontrada: {e}")
             self.services_cache = []
             self.dictionary_cache = {}
+            return
         except Exception as e:
             print(f"❌ Error al leer la fuente de datos: {str(e)}")
             self.services_cache = []
             self.dictionary_cache = {}
+            return
+
+        # El replay va aparte y no puede tirar abajo lo que ya se cargó bien: si
+        # falla (p.ej. límite de peticiones a la API), el catálogo se queda sin
+        # las revisiones restauradas en vez de vaciarse por completo.
+        try:
+            self._replay_audit_log()
+        except Exception as e:
+            print(f"⚠️ No se pudo reproducir la auditoría (el catálogo sigue disponible sin ella): {e}")
 
     def _replay_audit_log(self):
         """
@@ -69,11 +99,11 @@ class CatalogRepository:
         ya resuelta del servicio en el momento de la decisión), no la caché en
         memoria ni recalcular la lógica de conflictos de nuevo.
 
-        Por ahora la auditoría solo existe sobre el Excel físico local (todavía
-        no hay acceso a la API de Google Sheets para esto); si el archivo no
-        existe o no tiene hoja Auditoria, simplemente no hay nada que restaurar.
+        La auditoría vive en la misma fuente que el resto del catálogo (Excel
+        local o Google Sheets, según DATA_SOURCE); si no existe o no tiene
+        hoja Auditoria, simplemente no hay nada que restaurar.
         """
-        entries = ExcelAuditLog(get_excel_path()).read_all()
+        entries = build_audit_log().read_all()
 
         # Cada entrada es una foto completa del servicio en ese momento, así que
         # solo nos interesa la última por servicio (las anteriores ya quedaron
@@ -138,9 +168,28 @@ class CatalogRepository:
 
         return None
 
+    def remove_from_cache(self, names) -> None:
+        """
+        Excluye del catálogo activo los servicios ya guardados (volcados a
+        Diccionario/Desechados), para que dejen de aparecer en "Guardar en
+        Excel" y demás vistas durante el resto de esta sesión. Sus filas en
+        Perímetro siguen ahí tal cual, así que si el servidor se reinicia
+        podrían volver a aparecer (este filtro vive solo en memoria, no se
+        persiste en el Excel).
+        """
+        if not names:
+            return
+
+        name_set = {n.upper() for n in names}
+        self._excluded_from_catalog |= name_set
+        if self.services_cache:
+            self.services_cache = [s for s in self.services_cache if s.name.upper() not in name_set]
+
     def refresh(self):
-        """Recarga los servicios desde la fuente de datos"""
+        """Recarga los servicios desde la fuente de datos (sin pasar por el
+        margen mínimo entre comprobaciones: es una recarga pedida a propósito)"""
         self._load_services()
+        self._last_checked_at = time.monotonic()
 
     def refresh_if_source_changed(self) -> bool:
         """
@@ -148,10 +197,26 @@ class CatalogRepository:
         catálogo completo desde cero. Si no han cambiado, no hace nada y
         conserva cualquier revisión de conflictos ya aplicada en memoria.
         Devuelve True si recargó, False si no había cambios.
+
+        Para no golpear la API de Google Sheets en cada clic de la interfaz,
+        la comprobación en sí (que ya cuesta una llamada) se espacia como
+        mínimo MIN_CHECK_INTERVAL_SECONDS; dentro de ese margen se asume que
+        no ha cambiado y se sirve la caché tal cual.
         """
+        now = time.monotonic()
+        if now - self._last_checked_at < self.MIN_CHECK_INTERVAL_SECONDS:
+            return False
+        self._last_checked_at = now
+
         try:
             new_signature = self.reader.get_signature()
         except Exception:
+            # Si nunca hubo una carga exitosa (p.ej. la inicial falló por un
+            # límite temporal de la API), no nos quedamos atascados para
+            # siempre: probamos una carga completa de todas formas.
+            if self._source_signature is None and not self.services_cache:
+                self._load_services()
+                return True
             return False
 
         if self._source_signature is None or new_signature != self._source_signature:

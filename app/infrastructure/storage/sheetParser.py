@@ -23,6 +23,17 @@ class SheetDataParser:
         sus datos maestros (winning_data / exists_in_dictionary).
         """
         dictionary_records, perimeter_records = self.read_excel_sheets()
+        return self.extract_services_from_records(dictionary_records, perimeter_records)
+
+    def extract_services_from_records(
+        self, dictionary_records: List[Dict], perimeter_records: List[Dict]
+    ) -> List[ServiceEntity]:
+        """
+        Igual que extract_services_from_perimeter, pero a partir de registros
+        ya leídos. Evita una segunda lectura de la fuente (cara en Google
+        Sheets, donde cada lectura es una llamada a la API) cuando quien
+        llama ya leyó read_excel_sheets() por su cuenta.
+        """
         dictionary_index = self._build_dictionary_index(dictionary_records)
 
         if not perimeter_records:

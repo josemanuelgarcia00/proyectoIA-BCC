@@ -1,16 +1,14 @@
 from app.infrastructure.persistence.serviceRepository import CatalogRepository
 from app.application.conflictResolverService import ConflictResolver
-from app.infrastructure.storage.dataSourceFactory import build_writer, get_excel_path
-from app.infrastructure.storage.auditLog import ExcelAuditLog
+from app.infrastructure.storage.dataSourceFactory import build_writer, build_audit_log
 from app.domain.service import ServiceEntity
 
 class ServiceService:
     def __init__(self):
         # El servicio asume la responsabilidad de conectar con la persistencia
         self.repo = CatalogRepository()
-        # La auditoría, por ahora, solo existe sobre el Excel físico local
-        # (todavía no hay acceso a la API de Google Sheets para esto).
-        self.audit = ExcelAuditLog(get_excel_path())
+        # La auditoría va a Excel local o a Google Sheets, según DATA_SOURCE
+        self.audit = build_audit_log()
 
     def _log_decision(self, service: ServiceEntity, accion: str, valor: str = "", iteracion="") -> None:
         """
@@ -254,4 +252,24 @@ class ServiceService:
         written = writer.save_dictionary(target_services)
         rejected_written = writer.save_rejected(target_services)
 
-        return {"saved": True, "services_written": written, "rejected_written": rejected_written}
+        # Su dato final ya quedó fijado en Diccionario/Desechados: ya no hace
+        # falta seguir reproduciendo su historial de decisiones, ni que sigan
+        # apareciendo como pendientes en el resto de esta sesión. Solo aplica a
+        # los que de verdad se escribieron (closed=True): el escritor ignora en
+        # silencio los seleccionados que no tengan una decisión explícita.
+        saved_names = [s.name for s in target_services if s.closed]
+        self.audit.remove_for_services(saved_names)
+        self.repo.remove_from_cache(saved_names)
+
+        # Sus filas de Perímetro ya cumplieron su función: se archivan (no se
+        # borran) en 'Perímetro_Historico', para que de forma permanente dejen
+        # de compararse contra el Diccionario, sin perder el registro de cómo
+        # se propusieron originalmente.
+        archived = writer.archive_perimeter_rows(saved_names)
+
+        return {
+            "saved": True,
+            "services_written": written,
+            "rejected_written": rejected_written,
+            "perimeter_rows_archived": archived,
+        }
