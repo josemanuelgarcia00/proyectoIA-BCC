@@ -1,9 +1,7 @@
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import List, Literal, Optional
 from app.application.serviceService import ServiceService
-from app.application.conflictResolverService import ConflictResolver
 from app.infrastructure.api.dtos.serviceOutDTO import ServiceResponseDTO, ExcelRowDataResponseDTO
 
 router = APIRouter(
@@ -14,13 +12,6 @@ router = APIRouter(
 
 class ResolveIterationRequest(BaseModel):
     resolution: Literal["unify", "reject"] = "unify"
-
-
-@router.get("/ui", response_class=HTMLResponse, summary="Abrir interfaz de resolución de conflictos")
-def get_conflict_resolver_ui():
-    """Abre la interfaz web para resolver conflictos"""
-    with open("app/infrastructure/api/templates/conflict_resolver.html", "r", encoding="utf-8") as f:
-        return f.read()
 
 
 @router.post("/refresh", summary="Recargar el catálogo desde el Excel de origen")

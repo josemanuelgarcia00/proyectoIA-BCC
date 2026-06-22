@@ -35,8 +35,9 @@ app.include_router(service_router)
 
 @app.get("/", tags=["Inicio"])
 async def root():
-    """Redirige a la interfaz web de resolución de conflictos"""
-    return RedirectResponse(url="/api/v1/services/ui")
+    """Redirige a la documentación interactiva de la API. La interfaz web
+    (React) se sirve por separado, vía el servidor de Vite."""
+    return RedirectResponse(url="/docs")
 
 
 @app.get("/health", tags=["Salud"])
@@ -74,7 +75,7 @@ if __name__ == "__main__":
     print("=" * 70)
     print()
     print("📍 Acceso a la aplicación:")
-    print("   🌐 Web UI: http://localhost:8000")
+    print("   🌐 Interfaz web (React): http://localhost:5173 (servidor de Vite, aparte)")
     print("   📊 API Docs: http://localhost:8000/docs")
     print("   ⚙️  ReDoc: http://localhost:8000/redoc")
     print()
