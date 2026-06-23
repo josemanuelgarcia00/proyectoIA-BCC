@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_BASE } from '../apiBase';
 
 export default function SaveSelector({ services, loading, onSaved }) {
   const [selected, setSelected] = useState(new Set());
@@ -31,7 +32,7 @@ export default function SaveSelector({ services, loading, onSaved }) {
 
   const handleSave = () => {
     setSaving(true);
-    fetch('/api/v1/services/save-to-excel', {
+    fetch(`${API_BASE}/api/v1/services/save-to-excel`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ service_names: Array.from(selected) })

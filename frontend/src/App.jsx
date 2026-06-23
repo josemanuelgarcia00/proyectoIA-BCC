@@ -3,6 +3,7 @@ import IterationReview from './components/IterationReview';
 import DictionaryEntry from './components/DictionaryEntry';
 import RejectedEntry from './components/RejectedEntry';
 import SaveSelector from './components/SaveSelector';
+import { API_BASE } from './apiBase';
 import './index.css';
 
 const VIEW_LABELS = {
@@ -45,7 +46,7 @@ export default function App() {
 
     // Trae el catálogo actual en memoria (sin recargar desde el Excel de origen,
     // para no perder revisiones ya aplicadas que aún no se han guardado)
-    fetch('/api/v1/services/')
+    fetch(`${API_BASE}/api/v1/services/`)
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -72,7 +73,7 @@ export default function App() {
 
     // Trae TODO el contenido de la hoja Diccionario del Excel, no solo los
     // servicios que además aparecen en la hoja Perímetro actual
-    fetch('/api/v1/services/dictionary/full')
+    fetch(`${API_BASE}/api/v1/services/dictionary/full`)
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -97,7 +98,7 @@ export default function App() {
 
     // Trae los servicios marcados como Desechado en esta sesión, para poder
     // inspeccionarlos y, si procede, devolverlos a la zona de revisión
-    fetch('/api/v1/services/rejected')
+    fetch(`${API_BASE}/api/v1/services/rejected`)
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -122,7 +123,7 @@ export default function App() {
 
     // Trae el catálogo completo (todos los estados) para poder elegir qué
     // servicios guardar ya y cuáles dejar pendientes para otra sesión
-    fetch('/api/v1/services/')
+    fetch(`${API_BASE}/api/v1/services/`)
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();

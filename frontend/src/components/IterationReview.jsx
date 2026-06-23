@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../apiBase';
 
 const STATUS_STAMP = {
   'Aceptado': 'stamp-moss',
@@ -54,7 +55,7 @@ export default function IterationReview({ service, onServiceClosed }) {
     setResolvingId(iterationId);
     try {
       const res = await fetch(
-        `/api/v1/services/${encodeURIComponent(localService.service_name)}/iterations/${iterationId}/resolve`,
+        `${API_BASE}/api/v1/services/${encodeURIComponent(localService.service_name)}/iterations/${iterationId}/resolve`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -81,7 +82,7 @@ export default function IterationReview({ service, onServiceClosed }) {
     setResolvingId(iterationId);
     try {
       const res = await fetch(
-        `/api/v1/services/${encodeURIComponent(localService.service_name)}/iterations/${iterationId}/revert`,
+        `${API_BASE}/api/v1/services/${encodeURIComponent(localService.service_name)}/iterations/${iterationId}/revert`,
         { method: 'POST' }
       );
 
@@ -104,7 +105,7 @@ export default function IterationReview({ service, onServiceClosed }) {
     setResolvingId('reset');
     try {
       const res = await fetch(
-        `/api/v1/services/${encodeURIComponent(localService.service_name)}/reset`,
+        `${API_BASE}/api/v1/services/${encodeURIComponent(localService.service_name)}/reset`,
         { method: 'POST' }
       );
 
@@ -127,7 +128,7 @@ export default function IterationReview({ service, onServiceClosed }) {
     setResolvingId('accept-close');
     try {
       const res = await fetch(
-        `/api/v1/services/${encodeURIComponent(localService.service_name)}/accept/preview`
+        `${API_BASE}/api/v1/services/${encodeURIComponent(localService.service_name)}/accept/preview`
       );
 
       if (!res.ok) {
@@ -148,7 +149,7 @@ export default function IterationReview({ service, onServiceClosed }) {
     setResolvingId('accept-close');
     try {
       const res = await fetch(
-        `/api/v1/services/${encodeURIComponent(localService.service_name)}/accept`,
+        `${API_BASE}/api/v1/services/${encodeURIComponent(localService.service_name)}/accept`,
         { method: 'POST' }
       );
 
@@ -181,7 +182,7 @@ export default function IterationReview({ service, onServiceClosed }) {
     setResolvingId('reject-service');
     try {
       const res = await fetch(
-        `/api/v1/services/${encodeURIComponent(localService.service_name)}/reject`,
+        `${API_BASE}/api/v1/services/${encodeURIComponent(localService.service_name)}/reject`,
         { method: 'POST' }
       );
 
@@ -203,7 +204,7 @@ export default function IterationReview({ service, onServiceClosed }) {
     setSavingIterationObservations(true);
     try {
       const res = await fetch(
-        `/api/v1/services/${encodeURIComponent(localService.service_name)}/iterations/${iterationId}/observations`,
+        `${API_BASE}/api/v1/services/${encodeURIComponent(localService.service_name)}/iterations/${iterationId}/observations`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },

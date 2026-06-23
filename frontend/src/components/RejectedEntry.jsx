@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_BASE } from '../apiBase';
 
 export default function RejectedEntry({ service, onRestored }) {
   const [restoring, setRestoring] = useState(false);
@@ -29,7 +30,7 @@ export default function RejectedEntry({ service, onRestored }) {
     setRestoring(true);
     try {
       const res = await fetch(
-        `/api/v1/services/${encodeURIComponent(service.service_name)}/reject/revert`,
+        `${API_BASE}/api/v1/services/${encodeURIComponent(service.service_name)}/reject/revert`,
         { method: 'POST' }
       );
 
