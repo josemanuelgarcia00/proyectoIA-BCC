@@ -3,10 +3,9 @@ MOTOR DE RESOLUCIÓN DE CONFLICTOS
 Implementa la lógica de decisiones basada en iteraciones múltiples
 """
 from typing import Optional
-from app.domain.service import ServiceEntity, PerimeterIteration, ExcelRowData
-
-# Campos del modelo que se representan como listas (la unificación hace un merge/unión)
-LIST_FIELDS = {"inputs", "outputs", "invokes", "reference_tables"}
+from app.domain.service import (
+    ServiceEntity, PerimeterIteration, ExcelRowData, LIST_FIELDS, has_new_content
+)
 
 
 class ConflictResolver:
@@ -26,7 +25,7 @@ class ConflictResolver:
         current_value = current_value or ""
         if not previous_value:
             return current_value
-        if not current_value or current_value == previous_value:
+        if not has_new_content(current_value, previous_value, field_name):
             return previous_value
         return f"{previous_value} / {current_value}"
 

@@ -1,7 +1,7 @@
 import re
 from typing import List, Dict, Tuple, Optional
 from app.domain.service import (
-    ServiceEntity, PerimeterIteration, ExcelRowData, CellConflict
+    ServiceEntity, PerimeterIteration, ExcelRowData, CellConflict, has_new_content
 )
 
 
@@ -95,14 +95,22 @@ class SheetDataParser:
                 iterations.append(iteration)
 
             # Crear ServiceEntity
+            has_conflicts = any(it.conflicts for it in iterations)
+            # Si el servicio ya existía en el Diccionario y ninguna iteración
+            # propone nada distinto, no hay ningún cambio que revisar ni
+            # confirmar: se cierra solo, para que no aparezca como pendiente
+            # (p.ej. en la zona de guardado) algo con lo que no hay que hacer
+            # nada. Esto NO aplica a servicios nuevos (sin master_data): esos
+            # sí requieren una decisión explícita del usuario para incorporarse.
+            unchanged_existing = master_data is not None and not has_conflicts
+
             service = ServiceEntity(
                 name=service_name,
                 exists_in_dictionary="Si" if master_data else "No",
-                consolidated_status="En revision" if any(
-                    it.conflicts for it in iterations
-                ) else "Aceptado",
+                consolidated_status="En revision" if has_conflicts else "Aceptado",
                 winning_data=master_data,
-                perimeter_iterations=iterations
+                perimeter_iterations=iterations,
+                closed=unchanged_existing
             )
             services.append(service)
 
@@ -128,21 +136,115 @@ class SheetDataParser:
     # nombre de documento y versión: " | ", " - " o solo espacios, todos con "v"
     # delante del número de versión (caso real observado en el Diccionario).
     DOCUMENT_VERSION_PATTERN = re.compile(r'^(.*\S)\s*[-(|]?\s*[vV](\d+(?:\.\d+)*)\)?\s*$')
+    # Variante sin "v": la versión viene solo entre paréntesis, p.ej.
+    # "Documento.docx (2.0)" (sin el prefijo "v" delante del número).
+    DOCUMENT_VERSION_PARENS_PATTERN = re.compile(r'^(.*\S)\s*\((\d+(?:\.\d+)*)\)\s*$')
 
     @classmethod
     def _split_document_version(cls, value: str) -> Tuple[str, str]:
         """Separa un valor combinado 'documento + versión' en sus dos partes.
-        Si no se reconoce el patrón (p.ej. valores ya fusionados de varias
-        iteraciones sin versión al final), se devuelve el valor entero como
-        documento y la versión vacía."""
+
+        format_document_version (ver sheetRowFormat.py) siempre inserta un
+        único separador literal " | " entre el bloque de documento(s) y el
+        de versión(es), sin importar si cualquiera de los dos lados ya es en
+        sí mismo una lista fusionada de varias iteraciones (p.ej.
+        "DocA / DocB | v1.0 / 2.0"). Partir por ese separador es robusto ante
+        eso. El regex de abajo (DOCUMENT_VERSION_PATTERN), en cambio, solo
+        reconoce una única versión simple al final del texto: con más de un
+        valor fusionado no encaja, y entonces el valor entero (documento +
+        separador + versión) se devolvía como si fuera el documento,
+        perdiendo la versión real. Se conserva solo como fallback para datos
+        heredados que no usan "|" (formato antiguo "Documento - vX.Y")."""
         if not value:
             return "", ""
 
-        match = cls.DOCUMENT_VERSION_PATTERN.match(value.strip())
+        value = value.strip()
+        if " | " in value:
+            doc_part, version_part = value.rsplit(" | ", 1)
+            doc_part = doc_part.strip()
+            if "|" in doc_part:
+                # La parte del documento todavía tiene un "|" suelto: esto ya
+                # venía corrompido de ANTES de este arreglo (una fusión previa
+                # mezcló texto de documento y de versión sin separarlos bien).
+                # Se reconstruye quedándose solo con los nombres de documento
+                # únicos y descartando lo que en realidad es una versión.
+                doc_part = cls._clean_corrupted_document(doc_part)
+            return doc_part, cls._normalize_version(version_part)
+
+        match = cls.DOCUMENT_VERSION_PATTERN.match(value) or cls.DOCUMENT_VERSION_PARENS_PATTERN.match(value)
         if not match:
-            return value.strip(), ""
+            return value, ""
 
         return match.group(1).strip(" -|"), match.group(2)
+
+    # Un token que es en realidad una versión suelta ("v2.0", "(1.1)", "2.0"),
+    # útil para reconocer y descartar restos de versión que quedaron mezclados
+    # con nombres de documento en datos ya corrompidos antes de este arreglo.
+    _VERSION_TOKEN_PATTERN = re.compile(r'^\(?[vV]?\d+(?:\.\d+)*\)?$')
+
+    @classmethod
+    def _clean_corrupted_document(cls, doc_part: str) -> str:
+        """
+        Repara un valor de documento que ya venía corrompido (contiene "|"
+        sueltos, señal de fusiones repetidas antes de que _split_document_version
+        partiera bien la columna combinada): junta todos los fragmentos
+        separados por "|" o " / ", descarta los que en realidad son una
+        versión suelta, y elimina duplicados conservando el orden.
+
+        No se puede recuperar el emparejamiento original documento-versión
+        perdido en esa corrupción anterior, pero al menos evita seguir
+        mostrando un bloque de texto gigante y repetido.
+        """
+        fragments = []
+        for chunk in doc_part.split("|"):
+            fragments.extend(p.strip() for p in chunk.split(" / "))
+
+        seen = set()
+        cleaned = []
+        for fragment in fragments:
+            if not fragment or cls._VERSION_TOKEN_PATTERN.match(fragment):
+                continue
+            if fragment not in seen:
+                seen.add(fragment)
+                cleaned.append(fragment)
+
+        return " / ".join(cleaned)
+
+    @classmethod
+    def _normalize_version(cls, value: str) -> str:
+        """
+        Normaliza la versión a solo dígitos, sin importar si viene con el
+        prefijo "v"/"V", entre paréntesis, o ambos a la vez ("v2.0", "(2.0)"
+        y "(v2.0)" se normalizan igual). Si el valor es en sí mismo una
+        lista ya fusionada de varias iteraciones (separada por " / "), cada
+        parte se normaliza por separado, para no dejar un prefijo o
+        paréntesis suelto a mitad de la lista.
+
+        Sin esto, "v2.0" (tal cual puede venir en la columna de versión
+        separada del Perímetro) y "2.0" (ya partido de la columna combinada
+        del Diccionario) se verían como una versión nueva aunque sean la misma.
+        """
+        value = (value or "").strip()
+        if not value:
+            return ""
+
+        if " / " in value:
+            seen = set()
+            parts = []
+            for part in value.split(" / "):
+                normalized = cls._normalize_version(part)
+                if normalized and normalized not in seen:
+                    seen.add(normalized)
+                    parts.append(normalized)
+            return " / ".join(parts)
+
+        if value.startswith("(") and value.endswith(")"):
+            value = value[1:-1].strip()
+
+        if value[:1].lower() == "v":
+            value = value[1:].strip()
+
+        return value
 
     def _record_to_excel_row_data(self, record: Dict) -> ExcelRowData:
         """
@@ -179,6 +281,7 @@ class SheetDataParser:
             source_document = get_field(['documento_origen'], "")
         if not doc_version:
             doc_version = get_field(['doc_version', 'versión', 'version', 'version_doc'], "1.0.0")
+        doc_version = self._normalize_version(doc_version)
 
         return ExcelRowData(
             app=get_field(['app', 'aplicación', 'application'], ""),
@@ -223,12 +326,10 @@ class SheetDataParser:
             current_value = getattr(current_data, attr_name)
             base_value = getattr(baseline_data, attr_name)
 
-            # Normalizar para comparación
-            current_value_cmp = sorted(current_value) if isinstance(current_value, list) else current_value
-            base_value_cmp = sorted(base_value) if isinstance(base_value, list) else base_value
-
-            # Si son diferentes, registrar conflicto
-            if str(current_value_cmp) != str(base_value_cmp):
+            # Solo es un conflicto real si la propuesta aporta algo que la
+            # línea base todavía no contempla (p.ej. si ya se unificaron "A"
+            # y "B" y llega de nuevo "B" suelto, no hay nada nuevo que decidir).
+            if has_new_content(current_value, base_value, attr_name):
                 conflicts.append(CellConflict(
                     column=attr_name,
                     dictionary_base_value=str(base_value),
@@ -236,10 +337,16 @@ class SheetDataParser:
                 ))
 
         # Documento de origen y versión siempre forman un par: si cualquiera de
-        # los dos cambia, se reporta como un único conflicto conjunto.
-        current_doc = (current_data.source_document, current_data.doc_version)
-        base_doc = (baseline_data.source_document, baseline_data.doc_version)
-        if current_doc != base_doc:
+        # los dos aporta contenido nuevo, se reporta como un único conflicto conjunto.
+        doc_has_new = has_new_content(
+            current_data.source_document, baseline_data.source_document, 'source_document'
+        )
+        version_has_new = has_new_content(
+            current_data.doc_version, baseline_data.doc_version, 'doc_version'
+        )
+        if doc_has_new or version_has_new:
+            base_doc = (baseline_data.source_document, baseline_data.doc_version)
+            current_doc = (current_data.source_document, current_data.doc_version)
             conflicts.append(CellConflict(
                 column='document',
                 dictionary_base_value=f"{base_doc[0]} (v{base_doc[1]})",

@@ -5,9 +5,11 @@ export default function SaveSelector({ services, loading, onSaved }) {
   const [saving, setSaving] = useState(false);
 
   // Elegible = el usuario tomó una decisión explícita sobre él (aceptar y
-  // cerrar, o rechazar) y ya no tiene conflictos. No basta con "sin
-  // conflictos": un servicio nuevo o sin cambios puede quedar "Aceptado" por
-  // defecto sin que nadie lo haya confirmado, y eso no debería guardarse.
+  // cerrar, o rechazar) y ya no tiene conflictos. Un servicio NUEVO sin
+  // cambios puede quedar "Aceptado" por defecto sin que nadie lo haya
+  // confirmado, y eso no debería guardarse sin revisión. La excepción es un
+  // servicio que YA existía en el Diccionario y es idéntico al Perímetro: ahí
+  // no hay nada que decidir, así que el backend ya lo entrega cerrado.
   const isEligible = (s) => s.closed && !s.requires_attention;
   const eligible = services.filter(isEligible);
 

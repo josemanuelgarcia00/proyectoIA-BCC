@@ -28,6 +28,37 @@ class ExcelRowData(BaseModel):
     reliability: str
 
 
+# Campos del modelo que se representan como listas (la unificación hace un
+# merge/unión en vez de comparar el texto completo)
+LIST_FIELDS = {"inputs", "outputs", "invokes", "reference_tables"}
+
+
+def has_new_content(current_value, baseline_value, field_name: str) -> bool:
+    """
+    Indica si current_value aporta algo que baseline_value todavía no
+    contempla. Se usa tanto para detectar conflictos reales (solo si hay
+    contenido nuevo que decidir) como para fusionar sin duplicar texto que
+    ya forma parte de una unificación anterior (p.ej. si el valor base ya es
+    "A / B" y llega de nuevo "B" suelto, no aporta nada nuevo).
+    """
+    if field_name in LIST_FIELDS:
+        baseline_items = set(baseline_value or [])
+        return any(item not in baseline_items for item in (current_value or []))
+
+    current_value = (current_value or "").strip()
+    baseline_value = (baseline_value or "").strip()
+    if not current_value or current_value == baseline_value:
+        return False
+    if not baseline_value:
+        return True
+
+    # Un valor ya unificado queda concatenado con " / " (ver
+    # ConflictResolver._merge_values); si la propuesta nueva ya es una de
+    # esas partes, no aporta nada nuevo.
+    baseline_parts = {p.strip() for p in baseline_value.split(" / ")}
+    return current_value not in baseline_parts
+
+
 class PerimeterIteration(BaseModel):
     """Una iteración del perimetro con datos y conflictos identificados"""
     iteration_id: int
