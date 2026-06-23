@@ -60,5 +60,6 @@ build/
 # ==========================================
 .agents/
 .claude/
+CLAUDE.md
 graphify-out/
 skills-lock.json
