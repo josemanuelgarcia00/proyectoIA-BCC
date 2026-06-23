@@ -90,10 +90,11 @@ if __name__ == "__main__":
     print("=" * 70)
     print()
 
+    is_render = os.environ.get("RENDER", "").lower() == "true"
     uvicorn.run(
         "main:app",
-        host="127.0.0.1",
-        port=8000,
-        reload=True,
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 8000)),
+        reload=not is_render,
         log_level="info"
     )
