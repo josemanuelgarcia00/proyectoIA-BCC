@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-
-const API_BASE = import.meta.env.VITE_API_URL || '';
+import * as servicesApi from '../api/servicesApi';
 
 export default function RejectedEntry({ service, onRestored }) {
   const [restoring, setRestoring] = useState(false);
@@ -30,16 +29,7 @@ export default function RejectedEntry({ service, onRestored }) {
   const restoreToReview = async () => {
     setRestoring(true);
     try {
-      const res = await fetch(
-        `${API_BASE}/api/v1/services/${encodeURIComponent(service.service_name)}/reject/revert`,
-        { method: 'POST' }
-      );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || 'No se pudo mover el servicio a revisión');
-      }
-
+      await servicesApi.revertRejectService(service.service_name);
       showToast(`↩ ${service.service_name} movido a revisión`);
       if (onRestored) onRestored(service.service_name);
     } catch (e) {

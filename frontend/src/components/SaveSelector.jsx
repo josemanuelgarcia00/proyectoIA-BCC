@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-
-const API_BASE = import.meta.env.VITE_API_URL || '';
+import * as servicesApi from '../api/servicesApi';
 
 export default function SaveSelector({ services, loading, onSaved }) {
   const [selected, setSelected] = useState(new Set());
@@ -33,21 +32,10 @@ export default function SaveSelector({ services, loading, onSaved }) {
 
   const handleSave = () => {
     setSaving(true);
-    fetch(`${API_BASE}/api/v1/services/save-to-excel`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ service_names: Array.from(selected) })
-    })
-      .then(async r => {
-        if (!r.ok) {
-          const err = await r.json().catch(() => ({}));
-          throw new Error(err.detail || `HTTP ${r.status}`);
-        }
-        return r.json();
-      })
+    servicesApi.saveToSheet(Array.from(selected))
       .then(data => {
         if (data.saved) {
-          onSaved(`✅ Guardado en Excel: ${data.services_written} servicio(s) al Diccionario, ${data.rejected_written} a Desechados (${data.perimeter_rows_archived} fila(s) archivadas del Perímetro)`);
+          onSaved(`✅ Guardado en Google Sheets: ${data.services_written} servicio(s) al Diccionario, ${data.rejected_written} a Desechados (${data.perimeter_rows_archived} fila(s) archivadas del Perímetro)`);
         } else {
           onSaved(`⚠️ ${data.pending_services} de los seleccionados todavía tienen conflictos sin revisar`);
         }

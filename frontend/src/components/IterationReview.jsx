@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-const API_BASE = import.meta.env.VITE_API_URL || '';
+import * as servicesApi from '../api/servicesApi';
 
 const STATUS_STAMP = {
   'Aceptado': 'stamp-moss',
@@ -55,21 +54,7 @@ export default function IterationReview({ service, onServiceClosed }) {
   const resolveIteration = async (iterationId, resolution) => {
     setResolvingId(iterationId);
     try {
-      const res = await fetch(
-        `${API_BASE}/api/v1/services/${encodeURIComponent(localService.service_name)}/iterations/${iterationId}/resolve`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ resolution })
-        }
-      );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || 'No se pudo resolver la iteración');
-      }
-
-      const updated = await res.json();
+      const updated = await servicesApi.resolveIteration(localService.service_name, iterationId, resolution);
       setLocalService(updated);
       showToast(`✅ Iteración ${iterationId} revisada`);
     } catch (e) {
@@ -82,17 +67,7 @@ export default function IterationReview({ service, onServiceClosed }) {
   const revertIteration = async (iterationId) => {
     setResolvingId(iterationId);
     try {
-      const res = await fetch(
-        `${API_BASE}/api/v1/services/${encodeURIComponent(localService.service_name)}/iterations/${iterationId}/revert`,
-        { method: 'POST' }
-      );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || 'No se pudo volver atrás la iteración');
-      }
-
-      const updated = await res.json();
+      const updated = await servicesApi.revertIteration(localService.service_name, iterationId);
       setLocalService(updated);
       showToast(`↩ Iteración ${iterationId} restaurada`);
     } catch (e) {
@@ -105,17 +80,7 @@ export default function IterationReview({ service, onServiceClosed }) {
   const resetServiceConflicts = async () => {
     setResolvingId('reset');
     try {
-      const res = await fetch(
-        `${API_BASE}/api/v1/services/${encodeURIComponent(localService.service_name)}/reset`,
-        { method: 'POST' }
-      );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || 'No se pudo reiniciar el servicio');
-      }
-
-      const updated = await res.json();
+      const updated = await servicesApi.resetConflicts(localService.service_name);
       setLocalService(updated);
       showToast(`↺ Conflictos de ${localService.service_name} reiniciados`);
     } catch (e) {
@@ -128,16 +93,7 @@ export default function IterationReview({ service, onServiceClosed }) {
   const requestAcceptPreview = async () => {
     setResolvingId('accept-close');
     try {
-      const res = await fetch(
-        `${API_BASE}/api/v1/services/${encodeURIComponent(localService.service_name)}/accept/preview`
-      );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || 'No se pudo calcular el resultado final');
-      }
-
-      const preview = await res.json();
+      const preview = await servicesApi.previewAccept(localService.service_name);
       setPreviewData(preview);
     } catch (e) {
       showToast(`❌ ${e.message}`);
@@ -149,16 +105,7 @@ export default function IterationReview({ service, onServiceClosed }) {
   const confirmAcceptAndClose = async () => {
     setResolvingId('accept-close');
     try {
-      const res = await fetch(
-        `${API_BASE}/api/v1/services/${encodeURIComponent(localService.service_name)}/accept`,
-        { method: 'POST' }
-      );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || 'No se pudo aceptar el servicio');
-      }
-
+      await servicesApi.acceptAndClose(localService.service_name);
       setPreviewData(null);
       showToast(`✅ ${localService.service_name} aceptado y cerrado`);
       if (onServiceClosed) onServiceClosed(localService.service_name);
@@ -182,16 +129,7 @@ export default function IterationReview({ service, onServiceClosed }) {
     setConfirmDialog(null);
     setResolvingId('reject-service');
     try {
-      const res = await fetch(
-        `${API_BASE}/api/v1/services/${encodeURIComponent(localService.service_name)}/reject`,
-        { method: 'POST' }
-      );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || 'No se pudo rechazar el servicio');
-      }
-
+      await servicesApi.rejectService(localService.service_name);
       showToast(`❌ ${localService.service_name} rechazado`);
       if (onServiceClosed) onServiceClosed(localService.service_name);
     } catch (e) {
@@ -204,21 +142,9 @@ export default function IterationReview({ service, onServiceClosed }) {
   const saveIterationObservations = async (iterationId) => {
     setSavingIterationObservations(true);
     try {
-      const res = await fetch(
-        `${API_BASE}/api/v1/services/${encodeURIComponent(localService.service_name)}/iterations/${iterationId}/observations`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ observations: iterationObservations })
-        }
+      const updated = await servicesApi.updateIterationObservations(
+        localService.service_name, iterationId, iterationObservations
       );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || 'No se pudieron guardar las observaciones');
-      }
-
-      const updated = await res.json();
       setLocalService(updated);
       showToast('📝 Observaciones de la iteración guardadas');
     } catch (e) {

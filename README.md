@@ -1,268 +1,103 @@
-# 🔧 Gestor de Conflictos - ProyectoIA
+# 🔧 Gestor de Conflictos - ProyectoIA (100% estático, sin backend)
 
 Sistema web de resolución de conflictos entre iteraciones de datos del perímetro. Permite seleccionar y aplicar cambios sobre la primera iteración en función de lo que venga en las siguientes.
 
+Tras la migración **ya no hay backend** (FastAPI/Render): toda la lógica de negocio + la interfaz son un único sitio estático en `frontend/`, desplegable desde GitHub Pages, que **lee y escribe** un Google Sheet a través de un **Google Apps Script** propio (ver [`apps-script/Code.gs`](apps-script/Code.gs)). No hay credenciales ni secretos en el frontend; el Apps Script se ejecuta con la identidad de quien lo publica, así que el Sheet puede quedarse privado.
+
+> ⚠️ **Sin login ni token (de momento).** El Apps Script está publicado con acceso "cualquier usuario", así que **cualquiera con la URL `/exec` puede leer y escribir** el Sheet. Es una decisión consciente y temporal: más adelante se añadirá OAuth de Google para limitar quién puede escribir.
+
 ## 🎯 Características
 
-- **Motor de Resolución de Conflictos**: Compara automáticamente iteraciones múltiples
-- **Interfaz Web Minimalista**: Diseño limpio con paleta de azules
-- **Lógica de Cascada**: Reglas inteligentes para resolver conflictos
-- **Selección Manual de Campos**: Elige el valor que desees para cada campo en conflicto
-- **Estados Visuales**: Códigos de color para fácil identificación
-- **API RESTful**: Endpoints para integración con otros sistemas
+- **Motor de Resolución de Conflictos** en JavaScript (`frontend/src/domain/conflictResolver.js`)
+- **Interfaz Web**: React + Vite, en `frontend/`
+- **Lógica de Cascada**: reglas para resolver conflictos contra el Diccionario o la iteración anterior
+- **Sin servidor propio**: la fuente de datos es un Google Sheet, leído/escrito vía un Google Apps Script publicado como aplicación web
+- **Log de auditoría**: cada decisión se registra en la hoja `Auditoria` del Sheet y se reproduce al recargar para no perder revisiones en curso
 
-## 🚀 Inicio Rápido
+## 🏗️ Arquitectura
 
-### Requisitos
+```
+Google Sheet (Diccionario, Perímetro, Desechados, Perímetro_Historico, Auditoria)
+  ↕ (lectura/escritura, sin secretos: identidad del Apps Script)
+apps-script/Code.gs          → Google Apps Script publicado como aplicación web
+  ↕ (fetch GET/POST a la URL del Apps Script)
+frontend/src/google/         → llamadas al Apps Script (sheetsApi.js)
+frontend/src/storage/        → parseo/lectura/escritura de hojas + log de auditoría
+frontend/src/domain/         → entidades y motor de resolución de conflictos
+frontend/src/repository/     → caché en memoria del catálogo + replay del log de auditoría
+frontend/src/services/       → orquestación de alto nivel sobre el repositorio
+frontend/src/api/            → capa fina que devuelve los datos listos para la interfaz
+frontend/src/contexts/       → CatalogContext (estado de catálogo/vista), vía useCatalog()
+frontend/src/components/     → interfaz (IterationReview, DictionaryEntry, RejectedEntry, SaveSelector)
+```
 
-- Python 3.8+
-- pip
+No hay CORS que configurar ni servidor que desplegar: todo vive en `frontend/` y se publica como sitio estático.
 
-### Instalación
+## 🚀 Puesta en marcha
 
-1. **Clonar o descargar el proyecto**
+### 1. Publicar el Google Apps Script
+
+1. Ve a [script.google.com](https://script.google.com/) → **Nuevo proyecto**.
+2. Borra el contenido de `Code.gs` y pega el de [`apps-script/Code.gs`](apps-script/Code.gs).
+3. Pon `SHEET_ID` (arriba del archivo) con el ID de tu Sheet (de la URL `.../d/<ID>/edit`).
+4. **Implementar → Nueva implementación** → tipo **"Aplicación web"**:
+   - Ejecutar como: **Yo** (tu cuenta de Google, con acceso al Sheet)
+   - Quién tiene acceso: **Cualquier usuario**
+5. Autoriza los permisos (lectura y escritura de tus Sheets).
+6. Copia la URL que termina en `/exec`.
+
+> Cada cambio en `Code.gs` requiere **Gestionar implementaciones → Nueva versión** para que la URL publicada lo use.
+
+### 2. Configurar variables de entorno
+
 ```bash
-cd ProyectoIA
+cd frontend
+cp .env.example .env
+# Edita .env: VITE_GOOGLE_SHEET_ID (ID del Sheet) y VITE_APPS_SCRIPT_URL (la URL /exec)
+npm install
+npm run dev
 ```
 
-2. **Instalar dependencias**
-```bash
-pip install -r requirements.txt
-```
+La aplicación estará disponible en `http://localhost:5173/proyectoIA-BCC/` (ajusta `base` en `vite.config.js` si el repo se llama distinto).
 
-### Ejecución
+### 3. Desplegar en GitHub Pages
 
-```bash
-python main.py
-```
+1. En **Settings → Pages**, selecciona **Source: GitHub Actions**.
+2. En **Settings → Secrets and variables → Actions → Variables**, crea `VITE_GOOGLE_SHEET_ID` y `VITE_APPS_SCRIPT_URL` (mismos valores que en `.env`).
+3. Asegúrate de que `base` en `frontend/vite.config.js` coincide con el nombre del repo (`/proyectoIA-BCC/`).
+4. Cada push a `main`, `develop` o `feature/migration` dispara [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml), que compila `frontend/` y publica `frontend/dist` en GitHub Pages.
 
-**Nota**: Si no existe `servicios.xlsx`, el sistema generará automáticamente un archivo de ejemplo con datos de prueba y conflictos detectados.
+## 🔌 Hojas del Google Sheet
 
-La aplicación estará disponible en: `http://localhost:8000`
-
-## 📋 Estructura del Proyecto
-
-```
-ProyectoIA/
-├── main.py                          # Servidor FastAPI principal
-├── servicios.xlsx                   # Archivo Excel con datos (auto-generado)
-├── requirements.txt                 # Dependencias del proyecto
-├── app/
-│   ├── __init__.py
-│   ├── application/
-│   │   ├── serviceService.py        # Lógica de servicios
-│   │   └── conflictResolverService.py  # Motor de resolución de conflictos
-│   ├── domain/
-│   │   └── service.py               # Entidades de dominio
-│   └── infrastructure/
-│       ├── api/
-│       │   ├── dtos/
-│       │   │   └── serviceOutDTO.py      # DTOs de salida
-│       │   ├── templates/
-│       │   │   └── conflict_resolver.html # Interfaz web
-│       │   └── routers/
-│       │       └── controllers/
-│       │           └── serviceController.py  # Endpoints API
-│       ├── persistence/
-│       │   ├── dtos/
-│       │   │   └── servicePersistenceDTO.py  # DTOs de persistencia
-│       │   └── serviceRepository.py      # Acceso a datos (Lee Excel)
-│       └── storage/
-│           └── excelReader.py      # Lector de Excel y extractor de conflictos
-└── data/                           # Carpeta de datos
-```
-
-## 🔌 Endpoints API
-
-### Interfaz Web
-- **GET** `/api/v1/services/ui` - Abre la interfaz web de resolución
-
-### Servicios
-- **GET** `/api/v1/services/` - Obtener todos los servicios
-- **GET** `/api/v1/services/{id}` - Obtener servicio por ID
-
-### Salud
-- **GET** `/health` - Verificar estado del servidor
-
-## 🎨 Interfaz Web
-
-### Paleta de Colores
-
-| Color | Uso |
-|-------|-----|
-| Azul Primario (#0066cc) | Encabezados, botones principales |
-| Azul Claro (#e3f2fd) | Fondos de secciones |
-| Verde (#d4edda) | Estado Aceptado ✅ |
-| Púrpura (#e2d5f8) | Estado Unificado ⚖️ |
-| Naranja (#ffe5b4) | Estado En Revisión ⏳ |
-| Rojo (#f8d7da) | Conflictos/Rechazado ❌ |
-
-### Flujo de Uso
-
-1. **Buscar Servicio**: Ingresa el ID del servicio
-2. **Ver Iteraciones**: Se muestran todas las iteraciones disponibles
-3. **Detectar Conflictos**: Sistema identifica campos con valores diferentes
-4. **Seleccionar Valores**: Elige el valor deseado para cada campo
-5. **Aplicar Resolución**: Confirma los cambios
+| Hoja | Uso |
+|------|-----|
+| `Diccionario` | Catálogo maestro de servicios aceptados |
+| `Perímetro` | Propuestas/iteraciones a revisar (sufijo `(n)` para iteraciones sucesivas) |
+| `Desechados` | Servicios rechazados |
+| `Perímetro_Historico` | Filas de Perímetro ya procesadas (archivadas con fecha) |
+| `Auditoria` | Historial de decisiones (snapshot completo por acción), usado para restaurar el estado al recargar |
 
 ## ⚙️ Lógica de Resolución
 
-### Caso 1: Una Iteración
-- Opción de **Aceptar** o **Rechazar**
-- Sin necesidad de resolver conflictos
+Ver `frontend/src/domain/conflictResolver.js`:
 
-### Caso 2: Múltiples Iteraciones Idénticas
-- Se acepta automáticamente
-- Mensaje: "Todas las iteraciones tienen datos idénticos"
+- **Una Iteración**: aceptar o rechazar, sin conflictos que resolver.
+- **Iteraciones idénticas al Diccionario**: se aceptan automáticamente.
+- **Iteraciones con conflictos**: el usuario elige "Unificar" (combina ambos valores) o "Rechazar cambios" (mantiene la línea base) por cada iteración, en cascada.
 
-### Caso 3: Múltiples Iteraciones con Conflictos
-- Se muestra interfaz de selección de campos
-- Usuario elige el valor preferido para cada campo
-- Se construye el registro final fusionando selecciones
+Al pulsar **"Guardar en Google Sheets"**, los servicios resueltos se vuelcan a `Diccionario` (o `Desechados`), sus filas de `Perímetro` se archivan en `Perímetro_Historico` y se limpia su rastro en `Auditoria`.
 
-## 🔐 Modelos de Datos
+## 🐛 Solución de problemas
 
-### ServiceEntity (Dominio)
-```python
-{
-  "name": str,                       # ID del servicio
-  "exists_in_dictionary": str,       # "Si" o "No"
-  "consolidated_status": str,        # Estado actual
-  "winning_data": ExcelRowData,      # Datos ganadores
-  "perimeter_iterations": [          # Iteraciones
-    {
-      "iteration_id": int,
-      "data": ExcelRowData,
-      "conflicts": [CellConflict]
-    }
-  ]
-}
-```
+### "Falta VITE_APPS_SCRIPT_URL para leer/escribir el Sheet"
+Configura `frontend/.env` (ver `.env.example`) o, en GitHub Actions, las "Variables" del repositorio, con la URL `.../exec` de la implementación del Apps Script.
 
-### ExcelRowData
-```python
-{
-  "app": str,
-  "type": str,
-  "verb": str,
-  "scope": str,
-  "functional_use": str,
-  "inputs": [str],
-  "outputs": [str],
-  "invokes": [str],
-  "reference_tables": [str],
-  "source_document": str,
-  "doc_version": str,
-  "reliability": str
-}
-```
+### Cambié `Code.gs` pero no se nota
+Cada cambio requiere una **nueva versión** de la implementación (Implementar → Gestionar implementaciones → editar → Nueva versión).
 
-## 📊 Estados de Servicios
-
-| Estado | Ícono | Significado |
-|--------|-------|-----------|
-| **Aceptado** | ✅ | Datos validados y listos |
-| **Rechazado** | ❌ | Datos descartados |
-| **Unificado** | ⚖️ | Datos unificados de múltiples fuentes |
-| **En Revisión** | ⏳ | Esperando resolución manual |
-
-## 🐛 Solución de Problemas
-
-### Error: "Servicio no encontrado"
-- Verifica que el ID del servicio sea correcto (usa el nombre de la columna "Nombre" en Perímetro)
-- Asegúrate de que `servicios.xlsx` existe en la raíz del proyecto
-
-### Error: "Archivo Excel no encontrado"
-- Verifica la ruta configurada en `EXCEL_PATH` (o `DATA_SOURCE=google_sheets`)
-
-### El Excel no se lee correctamente
-- Verifica que el Excel tenga las hojas: "Diccionario" y "Perímetro"
-- Los nombres de columnas deben estar en la primera fila
-
-### Puerto 8000 en uso
-- Cambia el puerto en `main.py`:
-```python
-uvicorn.run("main:app", host="127.0.0.1", port=8001)
-```
-
-## 📝 Requisitos (requirements.txt)
-
-```
-fastapi
-uvicorn
-pydantic
-pandas
-openpyxl
-gspread
-google-auth
-```
-
-**Nota**: No se usa MongoDB. Los datos se leen desde Excel local o Google Sheets, según la variable de entorno `DATA_SOURCE`.
-
-## 🔄 Flujo de Datos
-
-```
-Excel (servicios.xlsx)
-  ↓
-ExcelReader (extrae y mapea datos)
-  ↓
-FastAPI Controller
-  ↓
-ServiceService (Aplicación)
-  ↓
-ConflictResolver (Motor de detección)
-  ↓
-ServiceResponseDTO (Serialización)
-  ↓
-Frontend Web (Visualización)
-```
-
-## 🎓 Ejemplo de Uso API
-
-### Obtener Servicio
-```bash
-curl http://localhost:8000/api/v1/services/ACTIVOS
-```
-
-### Respuesta
-```json
-{
-  "service_name": "ACTIVOS",
-  "status": "En revision",
-  "is_in_dictionary": true,
-  "requires_attention": true,
-  "perimeter_iterations": [
-    {
-      "iteration_id": 1,
-      "data": {
-        "app": "APP1",
-        "type": "Recurso",
-        "verb": "GET",
-        ...
-      },
-      "conflicts": []
-    }
-  ]
-}
-```
-
-## 🤝 Contribuciones
-
-Las contribuciones son bienvenidas. Por favor:
-1. Fork el proyecto
-2. Crea una rama para tu feature
-3. Commit tus cambios
-4. Push a la rama
-5. Abre un Pull Request
+### El POST de guardado falla por CORS
+El frontend envía las escrituras con `Content-Type: text/plain` a propósito para evitar el preflight CORS que Apps Script no responde. Si tocas `sheetsApi.js`, mantén ese detalle.
 
 ## 📄 Licencia
 
 Proyecto interno - ProyectoIA © 2025
-
-## 👥 Autor
-
-Desarrollado como solución de resolución de conflictos para gestión de servicios.
-
----
-
-**¿Preguntas?** Consulta la documentación de la API en `http://localhost:8000/docs`
