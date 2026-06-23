@@ -3,8 +3,9 @@ import IterationReview from './components/IterationReview';
 import DictionaryEntry from './components/DictionaryEntry';
 import RejectedEntry from './components/RejectedEntry';
 import SaveSelector from './components/SaveSelector';
-import { API_BASE } from './apiBase';
 import './index.css';
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 const VIEW_LABELS = {
   conflicts: { loading: 'pendientes', title: 'Pendientes de revisión', empty: 'No hay nada pendiente de revisión', select: 'revisar iteraciones y conflictos' },

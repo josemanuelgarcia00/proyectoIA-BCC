@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { API_BASE } from '../apiBase';
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export default function RejectedEntry({ service, onRestored }) {
   const [restoring, setRestoring] = useState(false);

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { API_BASE } from '../apiBase';
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export default function SaveSelector({ services, loading, onSaved }) {
   const [selected, setSelected] = useState(new Set());

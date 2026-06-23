@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE } from '../apiBase';
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 const STATUS_STAMP = {
   'Aceptado': 'stamp-moss',
