@@ -12,14 +12,15 @@
  *      (https://docs.google.com/spreadsheets/d/<ESTO>/edit).
  *   3. Implementar → Nueva implementación → tipo "Aplicación web":
  *        - Ejecutar como: Yo
- *        - Quién tiene acceso: Cualquier usuario
+ *        - Quién tiene acceso: Cualquier usuario, incluso anónimos  ← CRÍTICO para CORS
+ *          (Si pones solo "Cualquier usuario" Google exige login y rompe CORS en el navegador)
  *   4. Autoriza los permisos. Copia la URL que termina en /exec → es
  *      VITE_APPS_SCRIPT_URL en el frontend.
  *   5. Cada cambio de este código requiere "Gestionar implementaciones →
  *      Nueva versión" para que la URL publicada lo use.
  *
- * ⚠️ Con "acceso: cualquier usuario" y sin token, cualquiera con la URL puede
- * leer y escribir el Sheet. Es temporal; más adelante se añadirá OAuth.
+ * ⚠️ Con acceso anónimo cualquiera con la URL puede leer y escribir el Sheet.
+ * Es una decisión consciente y temporal; más adelante se añadirá OAuth.
  *
  * API
  *   GET  ?action=meta                      → { titles: [<nombres de hoja>] }
@@ -27,7 +28,8 @@
  *   POST { action:'clearAndWrite', sheet, values }  → crea/limpia la hoja y vuelca values
  */
 
-// ⬇️ Pon aquí el ID de tu Google Sheet.
+// ⚠️ OBLIGATORIO: cambia este valor por el ID real de tu Sheet antes de desplegar.
+// Lo encuentras en la URL: https://docs.google.com/spreadsheets/d/<ESTE_ID>/edit
 var SHEET_ID = 'PON_AQUI_EL_ID_DEL_SHEET';
 
 function jsonOutput(obj) {
@@ -42,6 +44,9 @@ function getSpreadsheet() {
 
 function doGet(e) {
   try {
+    if (!SHEET_ID || SHEET_ID === 'PON_AQUI_EL_ID_DEL_SHEET') {
+      return jsonOutput({ error: 'SHEET_ID no configurado — edita Code.gs y redespliega.' });
+    }
     var params = (e && e.parameter) || {};
     var action = params.action;
 
