@@ -15,8 +15,7 @@ export default function IterationReview({ service, onServiceClosed }) {
   const [resolvingId, setResolvingId] = useState(null);
   const [previewData, setPreviewData] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
-  const [iterationObservations, setIterationObservations] = useState('');
-  const [savingIterationObservations, setSavingIterationObservations] = useState(false);
+  const [rejectObservations, setRejectObservations] = useState('');
 
   // Cuando se selecciona otro servicio en la lista, reiniciamos el estado local
   useEffect(() => {
@@ -24,17 +23,6 @@ export default function IterationReview({ service, onServiceClosed }) {
     setToast(null);
     setPreviewData(null);
   }, [service]);
-
-  // Sincroniza el cuadro de observaciones con la iteración que sería rechazada
-  // si se pulsa "Rechazar": la primera con conflictos sin revisar, o si ya no
-  // quedan conflictos pendientes, la última iteración (la que se rechazaría
-  // por completo al rechazar el servicio).
-  useEffect(() => {
-    const iterations = localService?.perimeter_iterations || [];
-    const pending = iterations.filter(it => it.conflicts && it.conflicts.length > 0);
-    const target = pending[0] || iterations[iterations.length - 1] || null;
-    setIterationObservations(target?.observations || '');
-  }, [localService]);
 
   if (!localService || !localService.perimeter_iterations) {
     return <div className="empty">Cargando detalles del servicio...</div>;
@@ -117,18 +105,27 @@ export default function IterationReview({ service, onServiceClosed }) {
   };
 
   const rejectService = () => {
+    setRejectObservations('');
     setConfirmDialog({
       title: 'Rechazar servicio',
       message: `¿Seguro que quieres rechazar "${localService.service_name}"? No se incorporará al Diccionario.`,
       confirmLabel: 'Rechazar',
+      withObservations: true,
       onConfirm: performRejectService
     });
   };
 
-  const performRejectService = async () => {
+  const performRejectService = async (observations) => {
     setConfirmDialog(null);
     setResolvingId('reject-service');
     try {
+      const iterations = localService?.perimeter_iterations || [];
+      const targetIteration = iterations[iterations.length - 1] || null;
+      if (observations && targetIteration) {
+        await servicesApi.updateIterationObservations(
+          localService.service_name, targetIteration.iteration_id, observations
+        );
+      }
       await servicesApi.rejectService(localService.service_name);
       showToast(`❌ ${localService.service_name} rechazado`);
       if (onServiceClosed) onServiceClosed(localService.service_name);
@@ -139,18 +136,33 @@ export default function IterationReview({ service, onServiceClosed }) {
     }
   };
 
-  const saveIterationObservations = async (iterationId) => {
-    setSavingIterationObservations(true);
+  const rejectIterationWithConfirm = (iterationId) => {
+    setRejectObservations('');
+    setConfirmDialog({
+      title: 'Rechazar cambios de la iteración',
+      message: `¿Seguro que quieres descartar los cambios de la iteración ${iterationId}?`,
+      confirmLabel: 'Rechazar cambios',
+      withObservations: true,
+      onConfirm: (observations) => performRejectIteration(iterationId, observations)
+    });
+  };
+
+  const performRejectIteration = async (iterationId, observations) => {
+    setConfirmDialog(null);
+    setResolvingId(iterationId);
     try {
-      const updated = await servicesApi.updateIterationObservations(
-        localService.service_name, iterationId, iterationObservations
-      );
+      if (observations) {
+        await servicesApi.updateIterationObservations(
+          localService.service_name, iterationId, observations
+        );
+      }
+      const updated = await servicesApi.resolveIteration(localService.service_name, iterationId, 'reject');
       setLocalService(updated);
-      showToast('📝 Observaciones de la iteración guardadas');
+      showToast(`✅ Iteración ${iterationId} rechazada`);
     } catch (e) {
       showToast(`❌ ${e.message}`);
     } finally {
-      setSavingIterationObservations(false);
+      setResolvingId(null);
     }
   };
 
@@ -192,34 +204,6 @@ export default function IterationReview({ service, onServiceClosed }) {
   };
 
   const statusStampClass = STATUS_STAMP[localService.status] || 'stamp-ink';
-
-  // Cuadro de observaciones ligado siempre a una iteración concreta (la que se
-  // rechazaría si se pulsa "Rechazar"), nunca a una nota genérica del servicio
-  const iterationObservationsBox = (iterationId) => (
-    <div className="note-block" style={{ marginTop: '16px' }}>
-      <h4 className="subhead" style={{ marginBottom: '8px' }}>Observaciones de esta iteración</h4>
-      <textarea
-        value={iterationObservations}
-        onChange={(e) => setIterationObservations(e.target.value)}
-        placeholder="Notas sobre esta iteración, p. ej. el motivo si se va a rechazar (opcional)..."
-        rows={2}
-        style={{
-          width: '100%', padding: '8px', borderRadius: '2px',
-          border: '1px solid var(--rule)', fontSize: '13px',
-          fontFamily: 'inherit', resize: 'vertical'
-        }}
-      />
-      <div style={{ marginTop: '8px', textAlign: 'right' }}>
-        <button
-          className="btn-quiet"
-          disabled={savingIterationObservations}
-          onClick={() => saveIterationObservations(iterationId)}
-        >
-          {savingIterationObservations ? 'Guardando...' : 'Guardar observaciones'}
-        </button>
-      </div>
-    </div>
-  );
 
   // Solo se usa cuando el servicio SÍ existe en el Diccionario (si es nuevo, se
   // muestra en su lugar el aviso de una sola línea más abajo en el render)
@@ -298,8 +282,6 @@ export default function IterationReview({ service, onServiceClosed }) {
           {resolvingId === 'reject-service' ? 'Aplicando...' : 'Rechazar servicio'}
         </button>
       </div>
-
-      {lastIteration && iterationObservationsBox(lastIteration.iteration_id)}
     </div>
   );
 
@@ -344,8 +326,6 @@ export default function IterationReview({ service, onServiceClosed }) {
           {resolvingId === 'reject-service' ? 'Aplicando...' : 'Rechazar'}
         </button>
       </div>
-
-      {lastIteration && iterationObservationsBox(lastIteration.iteration_id)}
     </div>
   );
 
@@ -455,14 +435,12 @@ export default function IterationReview({ service, onServiceClosed }) {
                   <button
                     className="btn-reject"
                     disabled={resolvingId === currentIteration.iteration_id}
-                    onClick={() => resolveIteration(currentIteration.iteration_id, 'reject')}
+                    onClick={() => rejectIterationWithConfirm(currentIteration.iteration_id)}
                   >
                     {resolvingId === currentIteration.iteration_id ? 'Aplicando...' : 'Rechazar cambios'}
                   </button>
                 </div>
               </div>
-
-            {iterationObservationsBox(currentIteration.iteration_id)}
 
             </div>
           )}
@@ -574,12 +552,34 @@ export default function IterationReview({ service, onServiceClosed }) {
             <h3 style={{ color: 'var(--ink)', marginBottom: '10px', fontSize: '15px', fontWeight: 600 }}>
               {confirmDialog.title}
             </h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '20px' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: confirmDialog.withObservations ? '0' : '20px' }}>
               {confirmDialog.message}
             </p>
 
+            {confirmDialog.withObservations && (
+              <div style={{ marginTop: '16px', marginBottom: '20px' }}>
+                <label style={{
+                  display: 'block', fontSize: '12px', color: 'var(--text-muted)',
+                  marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px'
+                }}>
+                  Observaciones (opcional)
+                </label>
+                <textarea
+                  value={rejectObservations}
+                  onChange={(e) => setRejectObservations(e.target.value)}
+                  placeholder="Motivo del rechazo u otras notas..."
+                  rows={3}
+                  style={{
+                    width: '100%', padding: '8px', borderRadius: '2px',
+                    border: '1px solid var(--rule)', fontSize: '13px',
+                    fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+            )}
+
             <div className="buttons">
-              <button className="btn-reject" onClick={confirmDialog.onConfirm}>
+              <button className="btn-reject" onClick={() => confirmDialog.onConfirm(rejectObservations)}>
                 {confirmDialog.confirmLabel || 'Confirmar'}
               </button>
               <button
