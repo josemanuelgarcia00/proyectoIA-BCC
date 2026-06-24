@@ -25,6 +25,7 @@ export function CatalogProvider({ children }) {
   const [services, setServices] = useState([]);
   const [view, setView] = useState('conflicts');
   const [loading, setLoading] = useState(true);
+  const [hasBooted, setHasBooted] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortAlpha, setSortAlpha] = useState(false);
@@ -51,7 +52,10 @@ export function CatalogProvider({ children }) {
         console.error(`Error cargando ${nextView}:`, e);
         showToast(`❌ ${e.message}`);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setHasBooted(true);
+      });
   }, [showToast]);
 
   // Trae el catálogo actual en memoria (sin recargar desde el Sheet de
@@ -82,6 +86,7 @@ export function CatalogProvider({ children }) {
     services,
     view,
     loading,
+    hasBooted,
     selectedService,
     setSelectedService,
     searchTerm,

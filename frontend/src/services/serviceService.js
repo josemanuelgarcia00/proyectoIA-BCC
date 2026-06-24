@@ -1,7 +1,5 @@
-/** Puerto de app/application/serviceService.py: orquesta repository +
- * conflictResolver + auditLog + writer. Opera siempre sobre el Sheet
- * configurado en VITE_GOOGLE_SHEET_ID (ver ../config.js). */
-import { GOOGLE_SHEET_ID } from '../config';
+
+import { GOOGLE_SHEET_ID, APPS_SCRIPT_URL } from '../config';
 import * as repo from '../repository/catalogRepository';
 import * as conflictResolver from '../domain/conflictResolver';
 import * as auditLog from '../storage/auditLog';
@@ -12,8 +10,8 @@ import { hasWriteAccess } from '../google/sheetsApi';
 const SHEET_ID = GOOGLE_SHEET_ID;
 
 async function ensureInit() {
-  if (!SHEET_ID) {
-    throw new Error('Falta configurar VITE_GOOGLE_SHEET_ID');
+  if (!APPS_SCRIPT_URL) {
+    throw new Error('Falta configurar VITE_APPS_SCRIPT_URL (ver apps-script/Code.gs)');
   }
   await repo.init(SHEET_ID);
 }

@@ -1,13 +1,28 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import IterationReview from './components/IterationReview';
 import DictionaryEntry from './components/DictionaryEntry';
 import RejectedEntry from './components/RejectedEntry';
 import SaveSelector from './components/SaveSelector';
+import SplashScreen from './components/SplashScreen';
 import { CatalogProvider, useCatalog } from './contexts/CatalogContext';
 import './index.css';
 
-// Sin login: se lee el Sheet a través del Google Apps Script publicado
-// (VITE_APPS_SCRIPT_URL, solo lectura, ver google/sheetsApi.js).
+// AppInner vive dentro del provider para acceder a hasBooted
+function AppInner() {
+  const { hasBooted } = useCatalog();
+  const [showSplash, setShowSplash] = useState(true);
+  return (
+    <>
+      {showSplash && (
+        <SplashScreen
+          loadingComplete={hasBooted}
+          onFinished={() => setShowSplash(false)}
+        />
+      )}
+      <CatalogView />
+    </>
+  );
+}
 
 function CatalogView() {
   const {
@@ -152,7 +167,7 @@ function CatalogView() {
 export default function App() {
   return (
     <CatalogProvider>
-      <CatalogView />
+      <AppInner />
     </CatalogProvider>
   );
 }
