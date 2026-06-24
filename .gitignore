@@ -63,3 +63,4 @@ build/
 CLAUDE.md
 graphify-out/
 skills-lock.json
+.graphifyignore
