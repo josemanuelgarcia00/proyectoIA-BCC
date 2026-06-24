@@ -177,7 +177,10 @@ export function getResolvedServices() {
 }
 
 export function getRejectedServices() {
-  return (state.servicesCache || []).filter((s) => s.consolidated_status === 'Desechado');
+  return (state.servicesCache || []).filter(
+    (s) => s.consolidated_status === 'Desechado' ||
+           s.perimeter_iterations.some((it) => it.resolution === 'reject')
+  );
 }
 
 export async function getDictionaryRows(sheetId) {
