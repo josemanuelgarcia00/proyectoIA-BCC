@@ -5,6 +5,7 @@ import {
   createServiceEntity, createPerimeterIteration, createExcelRowData, createCellConflict,
   hasNewContent, cloneExcelRowData,
 } from '../domain/models';
+import { formatDocumentVersion } from './sheetRowFormat';
 
 const ITERATION_SUFFIX = /\s\((\d+)\)$/;
 const STRIP_ITERATION_SUFFIX = /\s\(\d+\)$/;
@@ -167,8 +168,8 @@ function detectConflicts(currentData, baselineData) {
   if (docHasNew || versionHasNew) {
     conflicts.push(createCellConflict({
       column: 'document',
-      dictionary_base_value: `${baselineData.source_document} (v${baselineData.doc_version})`,
-      perimeter_new_proposal: `${currentData.source_document} (v${currentData.doc_version})`,
+      dictionary_base_value: formatDocumentVersion(baselineData.source_document, baselineData.doc_version),
+      perimeter_new_proposal: formatDocumentVersion(currentData.source_document, currentData.doc_version),
     }));
   }
 

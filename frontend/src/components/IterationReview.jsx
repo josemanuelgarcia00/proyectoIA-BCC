@@ -405,7 +405,19 @@ export default function IterationReview({ service, onServiceClosed }) {
                 {currentIteration.conflicts.map((conflict, idx) => (
                   <div key={idx} className="conflict-row">
                     <div className="field-name">
-                      <span className="mono">{conflict.column === 'document' ? 'documento + versión' : conflict.column}</span>
+                      <span className="mono">{{
+                        document: 'documento + versión',
+                        reliability: 'fiabilidad',
+                        app: 'app',
+                        type: 'tipo',
+                        verb: 'verbo',
+                        scope: 'ámbito',
+                        functional_use: 'uso funcional',
+                        inputs: 'entradas',
+                        outputs: 'salidas',
+                        invokes: 'invoca',
+                        reference_tables: 'tablas referenciales',
+                      }[conflict.column] ?? conflict.column}</span>
                     </div>
                     <div className="field-values">
                       <div className="value-box">

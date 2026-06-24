@@ -1,11 +1,46 @@
 /** Puerto literal de app/application/conflictResolverService.py (lógica pura, sin I/O). */
-import { LIST_FIELDS, hasNewContent, cloneExcelRowData, createExcelRowData } from './models';
+import { LIST_FIELDS, hasNewContent, cloneExcelRowData, createExcelRowData, createCellConflict } from './models';
+import { formatDocumentVersion } from '../storage/sheetRowFormat';
 
 const ROW_FIELDS = [
   'app', 'type', 'verb', 'scope', 'functional_use',
   'inputs', 'outputs', 'invokes', 'reference_tables',
   'source_document', 'doc_version', 'reliability',
 ];
+
+const FIELDS_TO_CHECK = [
+  'app', 'type', 'verb', 'scope', 'functional_use',
+  'inputs', 'outputs', 'invokes', 'reference_tables', 'reliability',
+];
+
+/** Recalcula los conflictos entre dos ExcelRowData. Equivalente a detectConflicts
+ * de sheetParser, usado para actualizar la cascada tras cada resolución. */
+function buildConflicts(baselineData, currentData) {
+  if (!baselineData) return [];
+  const conflicts = [];
+
+  for (const attrName of FIELDS_TO_CHECK) {
+    if (hasNewContent(currentData[attrName], baselineData[attrName], attrName)) {
+      conflicts.push(createCellConflict({
+        column: attrName,
+        dictionary_base_value: String(baselineData[attrName]),
+        perimeter_new_proposal: String(currentData[attrName]),
+      }));
+    }
+  }
+
+  const docHasNew = hasNewContent(currentData.source_document, baselineData.source_document, 'source_document');
+  const versionHasNew = hasNewContent(currentData.doc_version, baselineData.doc_version, 'doc_version');
+  if (docHasNew || versionHasNew) {
+    conflicts.push(createCellConflict({
+      column: 'document',
+      dictionary_base_value: formatDocumentVersion(baselineData.source_document, baselineData.doc_version),
+      perimeter_new_proposal: formatDocumentVersion(currentData.source_document, currentData.doc_version),
+    }));
+  }
+
+  return conflicts;
+}
 
 function mergeValues(previousValue, currentValue, fieldName) {
   if (LIST_FIELDS.has(fieldName)) {
@@ -63,6 +98,15 @@ export function resolveIteration(service, iterationId, resolution = 'unify') {
 
   iteration.conflicts = [];
   iteration.resolution = resolution;
+
+  // Recalcular los conflictos de la siguiente iteración no resuelta contra
+  // los datos ya actualizados de esta, para que la visualización en cascada
+  // muestre siempre el "Valor anterior" correcto (post-resolución, no el original).
+  const next = iterations[idx + 1];
+  if (next && next.resolution === null) {
+    next.conflicts = buildConflicts(iteration.data, next.data);
+  }
+
   service.consolidated_status = computeStatus(service);
   return iteration;
 }
