@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import * as servicesApi from '../api/servicesApi';
+import { APP_CODES, FIELD_ENUM_OPTIONS } from '../domain/enums';
 
 function ListEditor({ items, onChange, label, error, onBlur }) {
   const list = Array.isArray(items) ? items : [];
@@ -61,6 +62,142 @@ function ListEditor({ items, onChange, label, error, onBlur }) {
         <span className={error.startsWith('__warning__') ? 'field-warning-msg' : 'field-error-msg'}>
           {error.replace('__warning__', '')}
         </span>
+      )}
+    </div>
+  );
+}
+
+const FIELD_INPUT_STYLE = {
+  width: '100%', padding: '4px 7px', fontSize: '13px',
+  borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box',
+};
+
+function FixedSelect({ value, onChange, onBlur, options, className }) {
+  const [open, setOpen] = React.useState(false);
+  const containerRef = React.useRef(null);
+  const normalize = (opt) => typeof opt === 'string' ? { value: opt, label: opt } : opt;
+  const opts = options.map(normalize);
+  const selected = opts.find((o) => o.value === value);
+  const isError = className === 'input-error';
+
+  React.useEffect(() => {
+    const close = (e) => { if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+
+  const select = (val) => { onChange(val); setOpen(false); };
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        onBlur={() => { setTimeout(() => setOpen(false), 150); if (onBlur) onBlur(); }}
+        style={{
+          ...FIELD_INPUT_STYLE,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          textAlign: 'left', background: 'white', cursor: 'pointer', fontWeight: 'normal',
+          border: `1px solid ${isError ? 'var(--rust, #c0392b)' : 'var(--rule)'}`,
+          color: selected ? 'var(--ink)' : 'var(--text-muted)',
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {selected ? selected.label : '— Seleccionar —'}
+        </span>
+        <span style={{ fontSize: '10px', color: 'var(--text-muted)', flexShrink: 0, marginLeft: '6px' }}>▼</span>
+      </button>
+      {open && (
+        <ul style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
+          background: 'white', border: '1px solid var(--rule)', borderTop: 'none',
+          borderRadius: '0 0 2px 2px', margin: 0, padding: 0, listStyle: 'none',
+          maxHeight: '142px', overflowY: 'auto',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.10)',
+        }}>
+          {opts.map((o) => (
+            <li
+              key={o.value}
+              onMouseDown={() => select(o.value)}
+              style={{
+                padding: '6px 10px', fontSize: '13px', cursor: 'pointer',
+                borderBottom: '1px solid var(--rule)',
+                color: o.value === value ? 'var(--primary-dark, #1a6b3c)' : 'var(--ink)',
+                background: o.value === value ? 'var(--primary-faint, #f0f8f4)' : 'white',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--primary-faint, #f0f8f4)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = o.value === value ? 'var(--primary-faint, #f0f8f4)' : 'white'; }}
+            >
+              {o.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function AppCodeInput({ value, onChange, onBlur, className }) {
+  const [open, setOpen] = React.useState(false);
+  const [query, setQuery] = React.useState(value ?? '');
+  const containerRef = React.useRef(null);
+
+  React.useEffect(() => { setQuery(value ?? ''); }, [value]);
+
+  React.useEffect(() => {
+    const close = (e) => { if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+
+  const filtered = query ? APP_CODES.filter((c) => c.startsWith(query)) : APP_CODES;
+
+  const select = (code) => { setQuery(code); onChange(code); setOpen(false); };
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative' }}>
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => {
+          const v = e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+          setQuery(v);
+          onChange(v);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => { setTimeout(() => setOpen(false), 150); if (onBlur) onBlur(); }}
+        maxLength={3}
+        placeholder="Código (3 letras, ej: ACG)"
+        className={className}
+        style={{ ...FIELD_INPUT_STYLE, letterSpacing: '2px' }}
+      />
+      {open && filtered.length > 0 && (
+        <ul style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
+          background: 'white', border: '1px solid var(--rule)', borderTop: 'none',
+          borderRadius: '0 0 2px 2px', margin: 0, padding: 0, listStyle: 'none',
+          maxHeight: '142px', overflowY: 'auto',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.10)',
+        }}>
+          {filtered.map((code) => (
+            <li
+              key={code}
+              onMouseDown={() => select(code)}
+              style={{
+                padding: '6px 10px', fontSize: '13px', cursor: 'pointer',
+                fontFamily: 'monospace', letterSpacing: '1px',
+                borderBottom: '1px solid var(--rule)',
+                color: code === value ? 'var(--primary-dark, #1a6b3c)' : 'var(--ink)',
+                background: code === value ? 'var(--primary-faint, #f0f8f4)' : 'white',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--primary-faint, #f0f8f4)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = code === value ? 'var(--primary-faint, #f0f8f4)' : 'white'; }}
+            >
+              {code}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
@@ -273,6 +410,9 @@ export default function IterationReview({ service, onServiceClosed }) {
       if (!localEdits[key] || !localEdits[key].trim()) {
         errors[key] = `El campo "${label}" no puede estar vacío`;
       }
+    }
+    if (!errors.app && localEdits.app && !/^[A-Z]{3}$/.test(localEdits.app.trim())) {
+      errors.app = 'El código de app debe tener exactamente 3 letras';
     }
     if (!localEdits.functional_use || !localEdits.functional_use.trim()) {
       errors.functional_use = '__warning__El campo "Uso funcional" está vacío';
@@ -494,26 +634,38 @@ export default function IterationReview({ service, onServiceClosed }) {
 
   // Para servicios nuevos: todos los campos editables salvo el documento de origen
   const newServiceResultBox = (() => {
-    const inp = (field) => {
+    const inp = (field, enumOptions = null) => {
       const errMsg = validationErrors[field];
       const isWarning = errMsg && errMsg.startsWith('__warning__');
       const hasError = !!errMsg && !isWarning;
+      const cls = hasError ? 'input-error' : isWarning ? 'input-warning' : '';
+      const onBlur = () => {
+        const val = (localEdits[field] || '').trim();
+        if (!val) {
+          setValidationErrors((prev) => ({ ...prev, [field]: `El campo no puede estar vacío` }));
+        } else if (field === 'app' && !/^[A-Z]{3}$/.test(val)) {
+          setValidationErrors((prev) => ({ ...prev, [field]: 'El código de app debe tener exactamente 3 letras' }));
+        } else {
+          setValidationErrors((prev) => ({ ...prev, [field]: null }));
+        }
+      };
+      const setVal = (v) => setLocalEdits((p) => ({ ...p, [field]: v }));
       return (
         <div>
-          <input
-            type="text"
-            value={localEdits[field] ?? ''}
-            onChange={(e) => setLocalEdits((p) => ({ ...p, [field]: e.target.value }))}
-            onBlur={() => {
-              if (!localEdits[field] || !localEdits[field].trim()) {
-                setValidationErrors((prev) => ({ ...prev, [field]: `El campo no puede estar vacío` }));
-              } else {
-                setValidationErrors((prev) => ({ ...prev, [field]: null }));
-              }
-            }}
-            className={hasError ? 'input-error' : isWarning ? 'input-warning' : ''}
-            style={{ width: '100%', padding: '4px 7px', fontSize: '13px', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box' }}
-          />
+          {field === 'app' ? (
+            <AppCodeInput value={localEdits[field] ?? ''} onChange={setVal} onBlur={onBlur} className={cls} />
+          ) : enumOptions ? (
+            <FixedSelect value={localEdits[field] ?? ''} onChange={setVal} onBlur={onBlur} options={enumOptions} className={cls} />
+          ) : (
+            <input
+              type="text"
+              value={localEdits[field] ?? ''}
+              onChange={(e) => setVal(e.target.value)}
+              onBlur={onBlur}
+              className={cls}
+              style={FIELD_INPUT_STYLE}
+            />
+          )}
           {errMsg && (
             <span className={isWarning ? 'field-warning-msg' : 'field-error-msg'}>
               {errMsg.replace('__warning__', '')}
@@ -527,9 +679,9 @@ export default function IterationReview({ service, onServiceClosed }) {
         <h3>Datos del servicio</h3>
 
         <div className="data-grid">
-          <div><label className="data-field-label">App</label>{inp('app')}</div>
-          <div><label className="data-field-label">Tipo</label>{inp('type')}</div>
-          <div><label className="data-field-label">Verbo</label>{inp('verb')}</div>
+          <div><label className="data-field-label">App</label>{inp('app', FIELD_ENUM_OPTIONS.app)}</div>
+          <div><label className="data-field-label">Tipo</label>{inp('type', FIELD_ENUM_OPTIONS.type)}</div>
+          <div><label className="data-field-label">Verbo</label>{inp('verb', FIELD_ENUM_OPTIONS.verb)}</div>
           <div><label className="data-field-label">Ámbito</label>{inp('scope')}</div>
           <div><span className="data-field-label">Fiabilidad</span>{finalData?.reliability || 'N/D'}</div>
           <div><span className="data-field-label">Documento</span>{finalData?.source_document || 'N/D'} <span className="mono">v{finalData?.doc_version || '-'}</span></div>
@@ -740,28 +892,37 @@ export default function IterationReview({ service, onServiceClosed }) {
                                 onBlur={() => setValidationErrors((prev) => ({ ...prev, [conflict.column]: null }))}
                               />
                             ) : <div className="label">Nueva propuesta</div>}
-                            {isEditable && !isList && (
-                              <>
-                                <input
-                                  type="text"
-                                  value={localEdits[conflict.column] ?? ''}
-                                  onChange={(e) => setLocalEdits((p) => ({ ...p, [conflict.column]: e.target.value }))}
-                                  onBlur={() => {
-                                    const val = localEdits[conflict.column];
-                                    if (!val || !val.trim()) {
-                                      setValidationErrors((prev) => ({ ...prev, [conflict.column]: 'El campo no puede estar vacío' }));
-                                    } else {
-                                      setValidationErrors((prev) => ({ ...prev, [conflict.column]: null }));
-                                    }
-                                  }}
-                                  className={validationErrors[conflict.column] ? 'input-error' : ''}
-                                  style={{ width: '100%', padding: '4px 7px', fontSize: '13px', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                                />
-                                {validationErrors[conflict.column] && (
-                                  <span className="field-error-msg">{validationErrors[conflict.column]}</span>
-                                )}
-                              </>
-                            )}
+                            {isEditable && !isList && (() => {
+                              const col = conflict.column;
+                              const enumOpts = FIELD_ENUM_OPTIONS[col];
+                              const hasErr = !!validationErrors[col];
+                              const cls = hasErr ? 'input-error' : '';
+                              const setVal = (v) => setLocalEdits((p) => ({ ...p, [col]: v }));
+                              const onBlurConflict = () => {
+                                const val = (localEdits[col] || '').trim();
+                                if (!val) {
+                                  setValidationErrors((prev) => ({ ...prev, [col]: 'El campo no puede estar vacío' }));
+                                } else if (col === 'app' && !/^[A-Z]{3}$/.test(val)) {
+                                  setValidationErrors((prev) => ({ ...prev, [col]: 'El código de app debe tener exactamente 3 letras' }));
+                                } else {
+                                  setValidationErrors((prev) => ({ ...prev, [col]: null }));
+                                }
+                              };
+                              let control;
+                              if (col === 'app') {
+                                control = <AppCodeInput value={localEdits[col] ?? ''} onChange={setVal} onBlur={onBlurConflict} className={cls} />;
+                              } else if (enumOpts) {
+                                control = <FixedSelect value={localEdits[col] ?? ''} onChange={setVal} onBlur={onBlurConflict} options={enumOpts} className={cls} />;
+                              } else {
+                                control = <input type="text" value={localEdits[col] ?? ''} onChange={(e) => setVal(e.target.value)} onBlur={onBlurConflict} className={cls} style={FIELD_INPUT_STYLE} />;
+                              }
+                              return (
+                                <>
+                                  {control}
+                                  {hasErr && <span className="field-error-msg">{validationErrors[col]}</span>}
+                                </>
+                              );
+                            })()}
                             {!isEditable && (
                               <div style={{ color: 'var(--ink)', fontWeight: 600 }}>
                                 {conflict.proposed || 'N/D'}
