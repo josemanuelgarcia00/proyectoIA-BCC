@@ -161,6 +161,19 @@ export async function updateObservations(itemId, observations) {
   return service;
 }
 
+export async function updateIterationData(itemId, iterationId, newData) {
+  await ensureInit();
+  const service = repo.getById(itemId);
+  if (!service) return null;
+
+  const iteration = service.perimeter_iterations.find((it) => it.iteration_id === iterationId);
+  if (!iteration) return null;
+
+  iteration.data = { ...iteration.data, ...newData };
+  await logDecision(service, 'update_iteration_data', JSON.stringify(newData), iterationId);
+  return service;
+}
+
 export async function updateIterationObservations(itemId, iterationId, observations) {
   await ensureInit();
   const service = repo.getById(itemId);

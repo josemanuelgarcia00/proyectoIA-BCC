@@ -16,13 +16,53 @@ export default function IterationReview({ service, onServiceClosed }) {
   const [previewData, setPreviewData] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [rejectObservations, setRejectObservations] = useState('');
+  const [localEdits, setLocalEdits] = useState({});
+  const [savingEdits, setSavingEdits] = useState(false);
+
+  const dataToEdits = (data) => ({
+    app: data.app || '',
+    type: data.type || '',
+    verb: data.verb || '',
+    scope: data.scope || '',
+    functional_use: data.functional_use || '',
+    inputs: (data.inputs || []).join('; '),
+    outputs: (data.outputs || []).join('; '),
+    invokes: (data.invokes || []).join('; '),
+    reference_tables: (data.reference_tables || []).join('; '),
+  });
 
   // Cuando se selecciona otro servicio en la lista, reiniciamos el estado local
   useEffect(() => {
     setLocalService(service);
     setToast(null);
     setPreviewData(null);
+    setLocalEdits({});
   }, [service]);
+
+  // Solo interesa mostrar iteraciones con conflictos pendientes de revisar
+  const visibleIterationsEarly = (localService?.perimeter_iterations || []).filter(
+    it => it.conflicts && it.conflicts.length > 0
+  );
+  const currentIterationId = visibleIterationsEarly[0]?.iteration_id ?? null;
+
+  // Inicializar edits cuando la iteración activa cambia
+  useEffect(() => {
+    const it = visibleIterationsEarly[0];
+    if (it) {
+      setLocalEdits(dataToEdits(it.data));
+    } else {
+      // Para servicios nuevos sin conflictos pendientes, inicializar desde la última iteración
+      const last = localService?.perimeter_iterations?.length > 0
+        ? localService.perimeter_iterations[localService.perimeter_iterations.length - 1]
+        : null;
+      if (!localService?.is_in_dictionary && last) {
+        setLocalEdits(dataToEdits(last.data));
+      } else {
+        setLocalEdits({});
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIterationId]);
 
   if (!localService || !localService.perimeter_iterations) {
     return <div className="empty">Cargando detalles del servicio...</div>;
@@ -136,6 +176,30 @@ export default function IterationReview({ service, onServiceClosed }) {
     }
   };
 
+  const saveIterationEdits = async (iterationId) => {
+    setSavingEdits(true);
+    try {
+      const dataToSave = {
+        app: localEdits.app,
+        type: localEdits.type,
+        verb: localEdits.verb,
+        scope: localEdits.scope,
+        functional_use: localEdits.functional_use,
+        inputs: localEdits.inputs.split(/[;,]/).map((s) => s.trim()).filter(Boolean),
+        outputs: localEdits.outputs.split(/[;,]/).map((s) => s.trim()).filter(Boolean),
+        invokes: localEdits.invokes.split(/[;,]/).map((s) => s.trim()).filter(Boolean),
+        reference_tables: localEdits.reference_tables.split(/[;,]/).map((s) => s.trim()).filter(Boolean),
+      };
+      const updated = await servicesApi.updateIterationData(localService.service_name, iterationId, dataToSave);
+      setLocalService(updated);
+      showToast('✅ Cambios guardados');
+    } catch (e) {
+      showToast(`❌ ${e.message}`);
+    } finally {
+      setSavingEdits(false);
+    }
+  };
+
   const rejectIterationWithConfirm = (iterationId) => {
     setRejectObservations('');
     setConfirmDialog({
@@ -166,7 +230,6 @@ export default function IterationReview({ service, onServiceClosed }) {
     }
   };
 
-  // Solo interesa mostrar iteraciones con conflictos pendientes de revisar
   const visibleIterations = localService.perimeter_iterations.filter(
     it => it.conflicts && it.conflicts.length > 0
   );
@@ -194,6 +257,12 @@ export default function IterationReview({ service, onServiceClosed }) {
   // Solo se muestra una iteración con conflictos a la vez (la siguiente aparece
   // al resolver la actual), manteniendo siempre su iteration_id original.
   const currentIteration = visibleIterations[0] || null;
+  const currentIndex = currentIteration
+    ? localService.perimeter_iterations.findIndex(it => it.iteration_id === currentIteration.iteration_id)
+    : -1;
+  const previousIteration = currentIndex > 0
+    ? localService.perimeter_iterations[currentIndex - 1]
+    : null;
   const totalConflictIterations = visibleIterations.length + resolvedIterations.length;
   const currentPosition = resolvedIterations.length + 1;
 
@@ -285,49 +354,95 @@ export default function IterationReview({ service, onServiceClosed }) {
     </div>
   );
 
-  // Para servicios nuevos: solo el dato y la decisión de aceptar/rechazar, sin
-  // hablar de "revisión completada" (no había nada del Diccionario que revisar)
-  const newServiceResultBox = (
-    <div className="data-card">
-      <h3>Datos del servicio</h3>
+  // Para servicios nuevos: todos los campos editables salvo el documento de origen
+  const newServiceResultBox = (() => {
+    const inp = (field) => (
+      <input
+        type="text"
+        value={localEdits[field] ?? ''}
+        onChange={(e) => setLocalEdits((p) => ({ ...p, [field]: e.target.value }))}
+        style={{ width: '100%', padding: '4px 7px', fontSize: '13px', border: '1px solid var(--rule)', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+      />
+    );
+    const ta = (field, rows = 2) => (
+      <textarea
+        rows={rows}
+        value={localEdits[field] ?? ''}
+        onChange={(e) => setLocalEdits((p) => ({ ...p, [field]: e.target.value }))}
+        style={{ width: '100%', padding: '4px 7px', fontSize: '13px', border: '1px solid var(--rule)', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+      />
+    );
+    return (
+      <div className="data-card">
+        <h3>Datos del servicio</h3>
 
-      <div className="data-grid">
-        <div><span className="data-field-label">App</span><span className="mono">{finalData?.app || 'N/A'}</span></div>
-        <div><span className="data-field-label">Tipo</span><span className="mono">{finalData?.type || 'N/A'}</span></div>
-        <div><span className="data-field-label">Verbo</span><span className="mono">{finalData?.verb || 'N/A'}</span></div>
-        <div><span className="data-field-label">Ámbito</span>{finalData?.scope || 'N/A'}</div>
-        <div><span className="data-field-label">Fiabilidad</span>{finalData?.reliability || 'N/A'}</div>
-        <div><span className="data-field-label">Documento</span>{finalData?.source_document || 'N/A'} <span className="mono">v{finalData?.doc_version || '-'}</span></div>
+        <div className="data-grid">
+          <div><label className="data-field-label">App</label>{inp('app')}</div>
+          <div><label className="data-field-label">Tipo</label>{inp('type')}</div>
+          <div><label className="data-field-label">Verbo</label>{inp('verb')}</div>
+          <div><label className="data-field-label">Ámbito</label>{inp('scope')}</div>
+          <div><span className="data-field-label">Fiabilidad</span>{finalData?.reliability || 'N/A'}</div>
+          <div><span className="data-field-label">Documento</span>{finalData?.source_document || 'N/A'} <span className="mono">v{finalData?.doc_version || '-'}</span></div>
 
-        <div className="data-field-block">
-          <span className="data-field-label">Uso funcional</span>
-          {finalData?.functional_use || 'N/A'}
+          <div className="wide data-field-block">
+            <label className="data-field-label">Uso funcional</label>
+            {ta('functional_use', 3)}
+          </div>
+          <div className="wide"><label className="data-field-label">Entradas <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(separar con ;)</span></label>{ta('inputs')}</div>
+          <div className="wide"><label className="data-field-label">Salidas <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(separar con ;)</span></label>{ta('outputs')}</div>
+          <div className="wide"><label className="data-field-label">Invoca <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(separar con ;)</span></label>{ta('invokes')}</div>
+          <div className="wide"><label className="data-field-label">Tablas referenciales <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(separar con ;)</span></label>{ta('reference_tables')}</div>
         </div>
 
-        <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(finalData?.inputs)}</span></div>
-        <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(finalData?.outputs)}</span></div>
-        <div className="wide"><span className="data-field-label">Invoca</span><span className="mono">{renderList(finalData?.invokes)}</span></div>
-        <div className="wide"><span className="data-field-label">Tablas referenciales</span><span className="mono">{renderList(finalData?.reference_tables)}</span></div>
+        <div className="buttons" style={{ marginTop: '20px' }}>
+          <button
+            className="btn-quiet"
+            disabled={savingEdits}
+            onClick={() => saveIterationEdits(lastIteration.iteration_id)}
+            style={{ fontSize: '12px', padding: '4px 12px' }}
+          >
+            {savingEdits ? 'Guardando...' : 'Guardar cambios'}
+          </button>
+          <button
+            className="btn-accept"
+            disabled={resolvingId === 'accept-close'}
+            onClick={requestAcceptPreview}
+          >
+            {resolvingId === 'accept-close' ? 'Calculando...' : 'Aceptar'}
+          </button>
+          <button
+            className="btn-reject"
+            disabled={resolvingId === 'reject-service'}
+            onClick={rejectService}
+          >
+            {resolvingId === 'reject-service' ? 'Aplicando...' : 'Rechazar'}
+          </button>
+        </div>
       </div>
+    );
+  })();
 
-      <div className="buttons" style={{ marginTop: '20px' }}>
-        <button
-          className="btn-accept"
-          disabled={resolvingId === 'accept-close'}
-          onClick={requestAcceptPreview}
-        >
-          {resolvingId === 'accept-close' ? 'Calculando...' : 'Aceptar'}
-        </button>
-        <button
-          className="btn-reject"
-          disabled={resolvingId === 'reject-service'}
-          onClick={rejectService}
-        >
-          {resolvingId === 'reject-service' ? 'Aplicando...' : 'Rechazar'}
-        </button>
+  const previousIterationBox = previousIteration ? (
+    <div className="data-card accent-primary">
+      <h3>Iteración anterior</h3>
+      <div className="data-grid">
+        <div><span className="data-field-label">App</span><span className="mono">{previousIteration.data?.app || 'N/A'}</span></div>
+        <div><span className="data-field-label">Tipo</span><span className="mono">{previousIteration.data?.type || 'N/A'}</span></div>
+        <div><span className="data-field-label">Verbo</span><span className="mono">{previousIteration.data?.verb || 'N/A'}</span></div>
+        <div><span className="data-field-label">Ámbito</span>{previousIteration.data?.scope || 'N/A'}</div>
+        <div><span className="data-field-label">Fiabilidad</span>{previousIteration.data?.reliability || 'N/A'}</div>
+        <div><span className="data-field-label">Documento</span>{previousIteration.data?.source_document || 'N/A'} <span className="mono">v{previousIteration.data?.doc_version || '-'}</span></div>
+        <div className="data-field-block">
+          <span className="data-field-label">Uso funcional</span>
+          {previousIteration.data?.functional_use || 'N/A'}
+        </div>
+        <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(previousIteration.data?.inputs)}</span></div>
+        <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(previousIteration.data?.outputs)}</span></div>
+        <div className="wide"><span className="data-field-label">Invoca</span><span className="mono">{renderList(previousIteration.data?.invokes)}</span></div>
+        <div className="wide"><span className="data-field-label">Tablas referenciales</span><span className="mono">{renderList(previousIteration.data?.reference_tables)}</span></div>
       </div>
     </div>
-  );
+  ) : null;
 
   return (
     <div className="iteration-review">
@@ -336,7 +451,7 @@ export default function IterationReview({ service, onServiceClosed }) {
         <span className={`stamp ${statusStampClass}`}>{localService.status}</span>
       </h2>
 
-      {isNewService && (
+      {isNewService && (allResolved || visibleIterations.length === 0) && (
         <div className="info-line" style={{ marginTop: '16px' }}>
           <span className="stamp stamp-amber">Nuevo</span>
           <span>No existe en el Diccionario Maestro — es un servicio nuevo detectado en el perímetro.</span>
@@ -364,18 +479,24 @@ export default function IterationReview({ service, onServiceClosed }) {
         )
       ) : (
         <>
-          {!isNewService && <div style={{ marginBottom: '24px' }}>{dictionaryBox}</div>}
+          {!isNewService
+            ? <div style={{ marginBottom: '24px' }}>{dictionaryBox}</div>
+            : previousIteration && <div style={{ marginBottom: '24px' }}>{previousIterationBox}</div>
+          }
           {currentIteration && (
           <div key={currentIteration.iteration_id} className="field-diff">
 
             <div className="iteration-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Iteración {currentIteration.iteration_id}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                Iteración {currentIteration.iteration_id}
+                {isNewService && <span className="stamp stamp-amber">Nuevo</span>}
+              </span>
               <span className="folio-count">Punto {currentPosition} de {totalConflictIterations}</span>
             </div>
 
-            {/* Datos detallados de la iteración actual */}
+            {/* Datos de la iteración — solo lectura */}
             <div style={{ margin: '18px 0' }}>
-              <h4 className="subhead">Datos capturados del perímetro</h4>
+              <h4 className="subhead" style={{ marginBottom: '12px' }}>Datos capturados del perímetro</h4>
               <div className="data-grid">
                 <div><span className="data-field-label">App</span><span className="mono">{currentIteration.data.app || 'N/A'}</span></div>
                 <div><span className="data-field-label">Tipo</span><span className="mono">{currentIteration.data.type || 'N/A'}</span></div>
@@ -383,12 +504,10 @@ export default function IterationReview({ service, onServiceClosed }) {
                 <div><span className="data-field-label">Ámbito</span>{currentIteration.data.scope || 'N/A'}</div>
                 <div><span className="data-field-label">Fiabilidad</span>{currentIteration.data.reliability || 'N/A'}</div>
                 <div><span className="data-field-label">Documento</span>{currentIteration.data.source_document || 'N/A'} <span className="mono">v{currentIteration.data.doc_version || '-'}</span></div>
-
                 <div className="data-field-block">
                   <span className="data-field-label">Uso funcional</span>
                   {currentIteration.data.functional_use || 'N/A'}
                 </div>
-
                 <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(currentIteration.data.inputs)}</span></div>
                 <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(currentIteration.data.outputs)}</span></div>
                 <div className="wide"><span className="data-field-label">Invoca</span><span className="mono">{renderList(currentIteration.data.invokes)}</span></div>
@@ -402,41 +521,76 @@ export default function IterationReview({ service, onServiceClosed }) {
                   Conflictos detectados ({currentIteration.conflicts.length})
                 </h4>
 
-                {currentIteration.conflicts.map((conflict, idx) => (
-                  <div key={idx} className="conflict-row">
-                    <div className="field-name">
-                      <span className="mono">{{
-                        document: 'documento + versión',
-                        reliability: 'fiabilidad',
-                        app: 'app',
-                        type: 'tipo',
-                        verb: 'verbo',
-                        scope: 'ámbito',
-                        functional_use: 'uso funcional',
-                        inputs: 'entradas',
-                        outputs: 'salidas',
-                        invokes: 'invoca',
-                        reference_tables: 'tablas referenciales',
-                      }[conflict.column] ?? conflict.column}</span>
-                    </div>
-                    <div className="field-values">
-                      <div className="value-box">
-                        <div className="label">Valor anterior</div>
-                        <div style={{ color: 'var(--text-muted)' }}>
-                          {conflict.original || 'N/D'}
+                {(() => {
+                  const EDITABLE_FIELDS = new Set(['app','type','verb','scope','functional_use','inputs','outputs','invokes','reference_tables']);
+                  const LIST_FIELDS = new Set(['inputs','outputs','invokes','reference_tables']);
+                  const FIELD_LABELS = {
+                    document: 'documento + versión',
+                    reliability: 'fiabilidad',
+                    app: 'app',
+                    type: 'tipo',
+                    verb: 'verbo',
+                    scope: 'ámbito',
+                    functional_use: 'uso funcional',
+                    inputs: 'entradas',
+                    outputs: 'salidas',
+                    invokes: 'invoca',
+                    reference_tables: 'tablas referenciales',
+                  };
+                  return currentIteration.conflicts.map((conflict, idx) => {
+                    const isEditable = EDITABLE_FIELDS.has(conflict.column);
+                    const isList = LIST_FIELDS.has(conflict.column);
+                    return (
+                      <div key={idx} className="conflict-row">
+                        <div className="field-name">
+                          <span className="mono">{FIELD_LABELS[conflict.column] ?? conflict.column}</span>
+                        </div>
+                        <div className="field-values">
+                          <div className="value-box">
+                            <div className="label">Valor anterior</div>
+                            <div style={{ color: 'var(--text-muted)' }}>
+                              {conflict.original || 'N/D'}
+                            </div>
+                          </div>
+                          <div className="value-box">
+                            <div className="label">Nueva propuesta</div>
+                            {isEditable ? (
+                              isList ? (
+                                <textarea
+                                  rows={2}
+                                  value={localEdits[conflict.column] ?? ''}
+                                  onChange={(e) => setLocalEdits((p) => ({ ...p, [conflict.column]: e.target.value }))}
+                                  style={{ width: '100%', padding: '4px 7px', fontSize: '13px', border: '1px solid var(--rule)', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+                                />
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={localEdits[conflict.column] ?? ''}
+                                  onChange={(e) => setLocalEdits((p) => ({ ...p, [conflict.column]: e.target.value }))}
+                                  style={{ width: '100%', padding: '4px 7px', fontSize: '13px', border: '1px solid var(--rule)', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                                />
+                              )
+                            ) : (
+                              <div style={{ color: 'var(--ink)', fontWeight: 600 }}>
+                                {conflict.proposed || 'N/D'}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="value-box">
-                        <div className="label">Nueva propuesta</div>
-                        <div style={{ color: 'var(--ink)', fontWeight: 600 }}>
-                          {conflict.proposed || 'N/D'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                    );
+                  });
+                })()}
 
                 <div className="buttons">
+                  <button
+                    className="btn-quiet"
+                    disabled={savingEdits}
+                    onClick={() => saveIterationEdits(currentIteration.iteration_id)}
+                    style={{ fontSize: '12px', padding: '4px 12px' }}
+                  >
+                    {savingEdits ? 'Guardando...' : 'Guardar cambios'}
+                  </button>
                   <button
                     className="btn-unify"
                     disabled={resolvingId === currentIteration.iteration_id}

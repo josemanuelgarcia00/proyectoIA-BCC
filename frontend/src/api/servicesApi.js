@@ -82,6 +82,12 @@ export async function updateObservations(itemId, observations) {
   return toResponseDTO(entity);
 }
 
+export async function updateIterationData(itemId, iterationId, newData) {
+  const entity = await serviceService.updateIterationData(itemId.toUpperCase(), iterationId, newData);
+  if (!entity) throw new Error('Servicio o iteración no encontrada');
+  return toResponseDTO(entity);
+}
+
 export async function updateIterationObservations(itemId, iterationId, observations) {
   const entity = await serviceService.updateIterationObservations(itemId.toUpperCase(), iterationId, observations);
   if (!entity) throw new Error('Servicio o iteración no encontrada');
