@@ -50,7 +50,7 @@ function CatalogView() {
           <button className="btn-header" onClick={loadConflicts}>Revisar servicios</button>
           <button className="btn-header" onClick={loadDictionary}>Ver diccionario completo</button>
           <button className="btn-header" onClick={loadRejected}>Ver desechados</button>
-          <button className="btn-header" onClick={loadSaveSelection}>Guardar en Google Sheets</button>
+          <button className="btn-header" onClick={loadSaveSelection}>Guardar servicios</button>
         </div>
       </header>
 

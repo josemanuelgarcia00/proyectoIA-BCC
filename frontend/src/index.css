@@ -616,6 +616,51 @@ button:disabled {
 }
 
 /* =========================================
+   VALIDACIÓN DE CAMPOS EDITABLES
+========================================= */
+
+.iteration-review input[type="text"],
+.iteration-review textarea {
+  border: 1px solid var(--rule);
+}
+
+.input-error {
+  border: 1px solid var(--rust) !important;
+  background-color: var(--rust-light) !important;
+}
+
+.input-error:focus {
+  outline: 2px solid var(--rust-light);
+  outline-offset: 1px;
+}
+
+.input-warning {
+  border: 1px solid var(--amber-ink) !important;
+  background-color: var(--amber-light) !important;
+}
+
+.input-warning:focus {
+  outline: 2px solid var(--amber-light);
+  outline-offset: 1px;
+}
+
+.field-error-msg {
+  display: block;
+  font-size: 11px;
+  color: var(--rust);
+  margin-top: 3px;
+  font-weight: 500;
+}
+
+.field-warning-msg {
+  display: block;
+  font-size: 11px;
+  color: var(--amber-ink);
+  margin-top: 3px;
+  font-weight: 500;
+}
+
+/* =========================================
    RESPONSIVE
 ========================================= */
 

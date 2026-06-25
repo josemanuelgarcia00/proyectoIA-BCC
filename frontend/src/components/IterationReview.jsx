@@ -1,8 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import * as servicesApi from '../api/servicesApi';
 
-function ListEditor({ items, onChange, label }) {
+function ListEditor({ items, onChange, label, error, onBlur }) {
   const list = Array.isArray(items) ? items : [];
+
+  const emptyIndices = new Set(
+    list.map((item, i) => (!item || !item.trim() ? i : -1)).filter((i) => i >= 0)
+  );
+  const lowerValues = list.map((s) => (s || '').trim().toLowerCase());
+  const dupeValues = new Set();
+  const seenValues = new Set();
+  for (const val of lowerValues) {
+    if (val && seenValues.has(val)) dupeValues.add(val);
+    if (val) seenValues.add(val);
+  }
+  const dupeIndices = new Set(
+    lowerValues.map((v, i) => (v && dupeValues.has(v) ? i : -1)).filter((i) => i >= 0)
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', position: 'relative' }}>
       <button
@@ -16,27 +31,37 @@ function ListEditor({ items, onChange, label }) {
         <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic' }}>N/D</span>
       )}
       <div className="list-editor-items">
-        {list.map((item, idx) => (
-          <div key={idx} style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            <input
-              type="text"
-              value={item}
-              onChange={(e) => {
-                const next = [...list];
-                next[idx] = e.target.value;
-                onChange(next);
-              }}
-              style={{ flex: 1, minWidth: 0, padding: '4px 7px', fontSize: '13px', border: '1px solid var(--rule)', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box' }}
-            />
-            <button
-              type="button"
-              onClick={() => onChange(list.filter((_, i) => i !== idx))}
-              title="Eliminar"
-              style={{ flex: 'none', padding: '4px 8px', fontSize: '11px', lineHeight: 1, cursor: 'pointer', border: '1px solid var(--rule)', borderRadius: '2px', background: 'white', color: 'var(--rust, #c0392b)', fontWeight: 600 }}
-            >Eliminar</button>
-          </div>
-        ))}
+        {list.map((item, idx) => {
+          const hasItemError = emptyIndices.has(idx) || dupeIndices.has(idx);
+          return (
+            <div key={idx} style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+              <input
+                type="text"
+                value={item}
+                onChange={(e) => {
+                  const next = [...list];
+                  next[idx] = e.target.value;
+                  onChange(next);
+                }}
+                onBlur={onBlur}
+                className={hasItemError ? 'input-error' : ''}
+                style={{ flex: 1, minWidth: 0, padding: '4px 7px', fontSize: '13px', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+              />
+              <button
+                type="button"
+                onClick={() => onChange(list.filter((_, i) => i !== idx))}
+                title="Eliminar"
+                style={{ flex: 'none', padding: '4px 8px', fontSize: '11px', lineHeight: 1, cursor: 'pointer', border: '1px solid var(--rule)', borderRadius: '2px', background: 'white', color: 'var(--rust, #c0392b)', fontWeight: 600 }}
+              >Eliminar</button>
+            </div>
+          );
+        })}
       </div>
+      {error && (
+        <span className={error.startsWith('__warning__') ? 'field-warning-msg' : 'field-error-msg'}>
+          {error.replace('__warning__', '')}
+        </span>
+      )}
     </div>
   );
 }
@@ -58,6 +83,7 @@ export default function IterationReview({ service, onServiceClosed }) {
   const [rejectObservations, setRejectObservations] = useState('');
   const [localEdits, setLocalEdits] = useState({});
   const [savingEdits, setSavingEdits] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
 
   const dataToEdits = (data) => ({
     app: data.app || '',
@@ -76,6 +102,7 @@ export default function IterationReview({ service, onServiceClosed }) {
     setLocalService(service);
     setToast(null);
     setPreviewData(null);
+    setValidationErrors({});
 
     // Inicializar localEdits desde el prop directamente: evita el bug de stale
     // dependency cuando dos servicios distintos comparten el mismo currentIterationId
@@ -104,6 +131,7 @@ export default function IterationReview({ service, onServiceClosed }) {
 
   // Inicializar edits cuando la iteración activa cambia
   useEffect(() => {
+    setValidationErrors({});
     const it = visibleIterationsEarly[0];
     if (it) {
       setLocalEdits(dataToEdits(it.data));
@@ -233,7 +261,58 @@ export default function IterationReview({ service, onServiceClosed }) {
     }
   };
 
+  const validateEdits = () => {
+    const errors = {};
+    const requiredFields = [
+      { key: 'app', label: 'App' },
+      { key: 'type', label: 'Tipo' },
+      { key: 'verb', label: 'Verbo' },
+      { key: 'scope', label: 'Ámbito' },
+    ];
+    for (const { key, label } of requiredFields) {
+      if (!localEdits[key] || !localEdits[key].trim()) {
+        errors[key] = `El campo "${label}" no puede estar vacío`;
+      }
+    }
+    if (!localEdits.functional_use || !localEdits.functional_use.trim()) {
+      errors.functional_use = '__warning__El campo "Uso funcional" está vacío';
+    }
+    const listFields = [
+      { key: 'inputs', label: 'Entradas' },
+      { key: 'outputs', label: 'Salidas' },
+      { key: 'invokes', label: 'Invoca' },
+      { key: 'reference_tables', label: 'Tablas referenciales' },
+    ];
+    for (const { key, label } of listFields) {
+      const list = localEdits[key];
+      if (!Array.isArray(list) || list.length === 0) continue;
+      const hasEmpty = list.some((item) => !item || !item.trim());
+      if (hasEmpty) {
+        errors[key] = `"${label}" contiene items vacíos`;
+        continue;
+      }
+      const lower = list.map((s) => s.trim().toLowerCase());
+      const seen = new Set();
+      const dupes = new Set();
+      for (const val of lower) {
+        if (seen.has(val)) dupes.add(val);
+        seen.add(val);
+      }
+      if (dupes.size > 0) {
+        errors[key] = `"${label}" tiene valores duplicados: "${[...dupes].join('", "')}"`;
+      }
+    }
+    return errors;
+  };
+
   const saveIterationEdits = async (iterationId) => {
+    const errors = validateEdits();
+    setValidationErrors(errors);
+    const blockingErrors = Object.values(errors).filter((e) => e && !e.startsWith('__warning__'));
+    if (blockingErrors.length > 0) {
+      showToast('❌ Corrige los errores antes de guardar');
+      return;
+    }
     setSavingEdits(true);
     try {
       const toArr = (v) => Array.isArray(v) ? v.filter(Boolean) : (v || '').split(/[;,]/).map((s) => s.trim()).filter(Boolean);
@@ -250,6 +329,7 @@ export default function IterationReview({ service, onServiceClosed }) {
       };
       const updated = await servicesApi.updateIterationData(localService.service_name, iterationId, dataToSave);
       setLocalService(updated);
+      setValidationErrors({});
       showToast('✅ Cambios guardados');
     } catch (e) {
       showToast(`❌ ${e.message}`);
@@ -414,14 +494,34 @@ export default function IterationReview({ service, onServiceClosed }) {
 
   // Para servicios nuevos: todos los campos editables salvo el documento de origen
   const newServiceResultBox = (() => {
-    const inp = (field) => (
-      <input
-        type="text"
-        value={localEdits[field] ?? ''}
-        onChange={(e) => setLocalEdits((p) => ({ ...p, [field]: e.target.value }))}
-        style={{ width: '100%', padding: '4px 7px', fontSize: '13px', border: '1px solid var(--rule)', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box' }}
-      />
-    );
+    const inp = (field) => {
+      const errMsg = validationErrors[field];
+      const isWarning = errMsg && errMsg.startsWith('__warning__');
+      const hasError = !!errMsg && !isWarning;
+      return (
+        <div>
+          <input
+            type="text"
+            value={localEdits[field] ?? ''}
+            onChange={(e) => setLocalEdits((p) => ({ ...p, [field]: e.target.value }))}
+            onBlur={() => {
+              if (!localEdits[field] || !localEdits[field].trim()) {
+                setValidationErrors((prev) => ({ ...prev, [field]: `El campo no puede estar vacío` }));
+              } else {
+                setValidationErrors((prev) => ({ ...prev, [field]: null }));
+              }
+            }}
+            className={hasError ? 'input-error' : isWarning ? 'input-warning' : ''}
+            style={{ width: '100%', padding: '4px 7px', fontSize: '13px', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+          />
+          {errMsg && (
+            <span className={isWarning ? 'field-warning-msg' : 'field-error-msg'}>
+              {errMsg.replace('__warning__', '')}
+            </span>
+          )}
+        </div>
+      );
+    };
     return (
       <div className="data-card">
         <h3>Datos del servicio</h3>
@@ -440,14 +540,33 @@ export default function IterationReview({ service, onServiceClosed }) {
               rows={3}
               value={localEdits.functional_use ?? ''}
               onChange={(e) => setLocalEdits((p) => ({ ...p, functional_use: e.target.value }))}
-              style={{ width: '100%', padding: '4px 7px', fontSize: '13px', border: '1px solid var(--rule)', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+              onBlur={() => {
+                if (!localEdits.functional_use || !localEdits.functional_use.trim()) {
+                  setValidationErrors((prev) => ({ ...prev, functional_use: '__warning__El campo "Uso funcional" está vacío' }));
+                } else {
+                  setValidationErrors((prev) => ({ ...prev, functional_use: null }));
+                }
+              }}
+              className={
+                validationErrors.functional_use
+                  ? validationErrors.functional_use.startsWith('__warning__')
+                    ? 'input-warning'
+                    : 'input-error'
+                  : ''
+              }
+              style={{ width: '100%', padding: '4px 7px', fontSize: '13px', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
             />
+            {validationErrors.functional_use && (
+              <span className="field-warning-msg">
+                {validationErrors.functional_use.replace('__warning__', '')}
+              </span>
+            )}
           </div>
           <div className="wide" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
-            <ListEditor label="Entradas" items={localEdits.inputs || []} onChange={(v) => setLocalEdits((p) => ({ ...p, inputs: v }))} />
-            <ListEditor label="Salidas" items={localEdits.outputs || []} onChange={(v) => setLocalEdits((p) => ({ ...p, outputs: v }))} />
-            <ListEditor label="Invoca" items={localEdits.invokes || []} onChange={(v) => setLocalEdits((p) => ({ ...p, invokes: v }))} />
-            <ListEditor label="Tablas referenciales" items={localEdits.reference_tables || []} onChange={(v) => setLocalEdits((p) => ({ ...p, reference_tables: v }))} />
+            <ListEditor label="Entradas" items={localEdits.inputs || []} onChange={(v) => setLocalEdits((p) => ({ ...p, inputs: v }))} error={validationErrors.inputs} onBlur={() => setValidationErrors((prev) => ({ ...prev, inputs: null }))} />
+            <ListEditor label="Salidas" items={localEdits.outputs || []} onChange={(v) => setLocalEdits((p) => ({ ...p, outputs: v }))} error={validationErrors.outputs} onBlur={() => setValidationErrors((prev) => ({ ...prev, outputs: null }))} />
+            <ListEditor label="Invoca" items={localEdits.invokes || []} onChange={(v) => setLocalEdits((p) => ({ ...p, invokes: v }))} error={validationErrors.invokes} onBlur={() => setValidationErrors((prev) => ({ ...prev, invokes: null }))} />
+            <ListEditor label="Tablas referenciales" items={localEdits.reference_tables || []} onChange={(v) => setLocalEdits((p) => ({ ...p, reference_tables: v }))} error={validationErrors.reference_tables} onBlur={() => setValidationErrors((prev) => ({ ...prev, reference_tables: null }))} />
           </div>
         </div>
 
@@ -458,7 +577,7 @@ export default function IterationReview({ service, onServiceClosed }) {
             onClick={() => saveIterationEdits(lastIteration.iteration_id)}
             style={{ fontSize: '12px', padding: '4px 12px' }}
           >
-            {savingEdits ? 'Guardando...' : 'Mantener estado'}
+            {savingEdits ? 'Guardando...' : 'Guardar estado'}
           </button>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button
@@ -617,15 +736,31 @@ export default function IterationReview({ service, onServiceClosed }) {
                                 label="Nueva propuesta"
                                 items={localEdits[conflict.column] || []}
                                 onChange={(v) => setLocalEdits((p) => ({ ...p, [conflict.column]: v }))}
+                                error={validationErrors[conflict.column]}
+                                onBlur={() => setValidationErrors((prev) => ({ ...prev, [conflict.column]: null }))}
                               />
                             ) : <div className="label">Nueva propuesta</div>}
                             {isEditable && !isList && (
-                              <input
-                                type="text"
-                                value={localEdits[conflict.column] ?? ''}
-                                onChange={(e) => setLocalEdits((p) => ({ ...p, [conflict.column]: e.target.value }))}
-                                style={{ width: '100%', padding: '4px 7px', fontSize: '13px', border: '1px solid var(--rule)', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                              />
+                              <>
+                                <input
+                                  type="text"
+                                  value={localEdits[conflict.column] ?? ''}
+                                  onChange={(e) => setLocalEdits((p) => ({ ...p, [conflict.column]: e.target.value }))}
+                                  onBlur={() => {
+                                    const val = localEdits[conflict.column];
+                                    if (!val || !val.trim()) {
+                                      setValidationErrors((prev) => ({ ...prev, [conflict.column]: 'El campo no puede estar vacío' }));
+                                    } else {
+                                      setValidationErrors((prev) => ({ ...prev, [conflict.column]: null }));
+                                    }
+                                  }}
+                                  className={validationErrors[conflict.column] ? 'input-error' : ''}
+                                  style={{ width: '100%', padding: '4px 7px', fontSize: '13px', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                                />
+                                {validationErrors[conflict.column] && (
+                                  <span className="field-error-msg">{validationErrors[conflict.column]}</span>
+                                )}
+                              </>
                             )}
                             {!isEditable && (
                               <div style={{ color: 'var(--ink)', fontWeight: 600 }}>
@@ -646,7 +781,7 @@ export default function IterationReview({ service, onServiceClosed }) {
                     onClick={() => saveIterationEdits(currentIteration.iteration_id)}
                     style={{ fontSize: '12px', padding: '4px 12px' }}
                   >
-                    {savingEdits ? 'Guardando...' : 'Mantener estado'}
+                    {savingEdits ? 'Guardando...' : 'Guardar estado'}
                   </button>
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <button

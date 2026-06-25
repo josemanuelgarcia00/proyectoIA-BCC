@@ -7,7 +7,7 @@ const VIEW_LABELS = {
   conflicts: { loading: 'pendientes', title: 'Pendientes de revisión', empty: 'No hay nada pendiente de revisión', select: 'revisar iteraciones y conflictos' },
   dictionary: { loading: 'diccionario', title: 'Diccionario completo', empty: 'El Diccionario todavía no tiene servicios', select: 'ver sus datos' },
   rejected: { loading: 'desechados', title: 'Servicios desechados', empty: 'No hay servicios desechados', select: 'ver sus datos y moverlo a revisión' },
-  save: { loading: 'catálogo', title: 'Guardar en Google Sheets', empty: 'No hay servicios cargados', select: '' },
+  save: { loading: 'catálogo', title: 'Guardar servicios', empty: 'No hay servicios cargados', select: '' },
 };
 
 // Pendiente de revisión: tiene conflictos sin resolver, es un servicio nuevo
