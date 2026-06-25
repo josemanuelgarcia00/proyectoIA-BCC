@@ -24,9 +24,9 @@ export default function RejectedEntry({ service, onRestored }) {
   };
 
   const isWholeServiceRejected = localService.status === 'Desechado';
-  const rejectedIterations = (localService.perimeter_iterations || []).filter(
-    (it) => it.resolution === 'reject'
-  );
+  const rejectedIterations = isWholeServiceRejected
+    ? (localService.perimeter_iterations || [])
+    : (localService.perimeter_iterations || []).filter((it) => it.resolution === 'reject');
 
   const restoreIteration = async (iterationId) => {
     setSavingId(iterationId);
@@ -66,18 +66,6 @@ export default function RejectedEntry({ service, onRestored }) {
           {isWholeServiceRejected ? 'Desechado' : 'Iteraciones rechazadas'}
         </span>
       </h2>
-
-      {isWholeServiceRejected && (
-        <div className="buttons" style={{ marginBottom: '20px' }}>
-          <button
-            className="btn-unify"
-            disabled={savingId === 'whole'}
-            onClick={restoreWholeService}
-          >
-            {savingId === 'whole' ? 'Aplicando...' : 'Mover a revisión'}
-          </button>
-        </div>
-      )}
 
       {rejectedIterations.length === 0 ? (
         <div className="empty" style={{ border: '1px solid var(--rule)', borderRadius: '3px', background: 'white' }}>
