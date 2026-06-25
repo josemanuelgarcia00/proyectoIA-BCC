@@ -71,7 +71,24 @@ export default function IterationReview({ service, onServiceClosed }) {
     setLocalService(service);
     setToast(null);
     setPreviewData(null);
-    setLocalEdits({});
+
+    // Inicializar localEdits desde el prop directamente: evita el bug de stale
+    // dependency cuando dos servicios distintos comparten el mismo currentIterationId
+    // (ej. ambos tienen iteration_id=1 pendiente) y Effect 2 no se re-ejecuta.
+    const newVisible = (service?.perimeter_iterations || []).filter(
+      it => it.conflicts && it.conflicts.length > 0
+    );
+    const firstIt = newVisible[0];
+    if (firstIt) {
+      setLocalEdits(dataToEdits(firstIt.data));
+    } else {
+      const last = (service?.perimeter_iterations || []).slice(-1)[0] ?? null;
+      if (!service?.is_in_dictionary && last) {
+        setLocalEdits(dataToEdits(last.data));
+      } else {
+        setLocalEdits({});
+      }
+    }
   }, [service]);
 
   // Solo interesa mostrar iteraciones con conflictos pendientes de revisar
