@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as servicesApi from '../api/servicesApi';
 
-const renderList = (list) => (!list || list.length === 0 ? 'N/A' : list.join(', '));
+const renderList = (list) => (!list || list.length === 0 ? 'N/D' : list.join(', '));
 
 export default function RejectedEntry({ service, onRestored }) {
   const [localService, setLocalService] = useState(service);
@@ -138,15 +138,15 @@ export default function RejectedEntry({ service, onRestored }) {
                 {isExpanded && (
                   <div style={{ padding: '16px' }}>
                     <div className="data-grid" style={{ marginBottom: '16px' }}>
-                      <div><span className="data-field-label">App</span><span className="mono">{it.data.app || 'N/A'}</span></div>
-                      <div><span className="data-field-label">Tipo</span><span className="mono">{it.data.type || 'N/A'}</span></div>
-                      <div><span className="data-field-label">Verbo</span><span className="mono">{it.data.verb || 'N/A'}</span></div>
-                      <div><span className="data-field-label">Ámbito</span>{it.data.scope || 'N/A'}</div>
-                      <div><span className="data-field-label">Fiabilidad</span>{it.data.reliability || 'N/A'}</div>
-                      <div><span className="data-field-label">Documento</span>{it.data.source_document || 'N/A'} <span className="mono">v{it.data.doc_version || '-'}</span></div>
+                      <div><span className="data-field-label">App</span><span className="mono">{it.data.app || 'N/D'}</span></div>
+                      <div><span className="data-field-label">Tipo</span><span className="mono">{it.data.type || 'N/D'}</span></div>
+                      <div><span className="data-field-label">Verbo</span><span className="mono">{it.data.verb || 'N/D'}</span></div>
+                      <div><span className="data-field-label">Ámbito</span>{it.data.scope || 'N/D'}</div>
+                      <div><span className="data-field-label">Fiabilidad</span>{it.data.reliability || 'N/D'}</div>
+                      <div><span className="data-field-label">Documento</span>{it.data.source_document || 'N/D'} <span className="mono">v{it.data.doc_version || '-'}</span></div>
                       <div className="data-field-block">
                         <span className="data-field-label">Uso funcional</span>
-                        {it.data.functional_use || 'N/A'}
+                        {it.data.functional_use || 'N/D'}
                       </div>
                       <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(it.data.inputs)}</span></div>
                       <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(it.data.outputs)}</span></div>

@@ -46,7 +46,7 @@ function CatalogView() {
         <span className="eyebrow">Cajamar · Registro de servicios</span>
         <h1>Gestor de Conflictos de Servicios</h1>
         <p>Concilia el Perímetro frente al Diccionario y resuelve cada conflicto sin perder datos</p>
-        <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+        <div style={{ display: 'flex', gap: '10px', marginTop: '16px', flexWrap: 'wrap' }}>
           <button className="btn-header" onClick={loadConflicts}>Revisar servicios</button>
           <button className="btn-header" onClick={loadDictionary}>Ver diccionario completo</button>
           <button className="btn-header" onClick={loadRejected}>Ver desechados</button>

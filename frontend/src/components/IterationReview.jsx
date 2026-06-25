@@ -12,26 +12,31 @@ function ListEditor({ items, onChange, label }) {
         style={{ position: 'absolute', top: 0, right: 0, width: '18px', height: '18px', cursor: 'pointer', border: '1px solid #2e7d32', borderRadius: '2px', background: '#2e7d32', color: 'white', fontWeight: 700, fontSize: '13px', lineHeight: 1, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       >+</button>
       <span className="data-field-label" style={{ margin: 0, marginBottom: '4px', paddingRight: '22px' }}>{label || ''}</span>
-      {list.map((item, idx) => (
-        <div key={idx} style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-          <input
-            type="text"
-            value={item}
-            onChange={(e) => {
-              const next = [...list];
-              next[idx] = e.target.value;
-              onChange(next);
-            }}
-            style={{ width: '80%', padding: '4px 7px', fontSize: '13px', border: '1px solid var(--rule)', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box' }}
-          />
-          <button
-            type="button"
-            onClick={() => onChange(list.filter((_, i) => i !== idx))}
-            title="Eliminar"
-            style={{ width: '20%', padding: '2px 4px', fontSize: '10px', lineHeight: 1, cursor: 'pointer', border: '1px solid var(--rule)', borderRadius: '2px', background: 'white', color: 'var(--rust, #c0392b)' }}
-          >Eliminar</button>
-        </div>
-      ))}
+      {list.length === 0 && (
+        <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic' }}>N/D</span>
+      )}
+      <div className="list-editor-items">
+        {list.map((item, idx) => (
+          <div key={idx} style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            <input
+              type="text"
+              value={item}
+              onChange={(e) => {
+                const next = [...list];
+                next[idx] = e.target.value;
+                onChange(next);
+              }}
+              style={{ flex: 1, minWidth: 0, padding: '4px 7px', fontSize: '13px', border: '1px solid var(--rule)', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+            />
+            <button
+              type="button"
+              onClick={() => onChange(list.filter((_, i) => i !== idx))}
+              title="Eliminar"
+              style={{ flex: 'none', padding: '4px 8px', fontSize: '11px', lineHeight: 1, cursor: 'pointer', border: '1px solid var(--rule)', borderRadius: '2px', background: 'white', color: 'var(--rust, #c0392b)', fontWeight: 600 }}
+            >Eliminar</button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -122,7 +127,7 @@ export default function IterationReview({ service, onServiceClosed }) {
 
   // Función auxiliar para renderizar listas de forma segura
   const renderList = (list) => {
-    if (!list || list.length === 0) return 'N/A';
+    if (!list || list.length === 0) return 'N/D';
     return list.join(', ');
   };
 
@@ -334,16 +339,16 @@ export default function IterationReview({ service, onServiceClosed }) {
       <h3>Diccionario maestro</h3>
 
       <div className="data-grid">
-        <div><span className="data-field-label">App</span><span className="mono">{localService.dictionary_data?.app || 'N/A'}</span></div>
-        <div><span className="data-field-label">Tipo</span><span className="mono">{localService.dictionary_data?.type || 'N/A'}</span></div>
-        <div><span className="data-field-label">Verbo</span><span className="mono">{localService.dictionary_data?.verb || 'N/A'}</span></div>
-        <div><span className="data-field-label">Ámbito</span>{localService.dictionary_data?.scope || 'N/A'}</div>
-        <div><span className="data-field-label">Fiabilidad</span>{localService.dictionary_data?.reliability || 'N/A'}</div>
-        <div><span className="data-field-label">Documento</span>{localService.dictionary_data?.source_document || 'N/A'} <span className="mono">v{localService.dictionary_data?.doc_version || '-'}</span></div>
+        <div><span className="data-field-label">App</span><span className="mono">{localService.dictionary_data?.app || 'N/D'}</span></div>
+        <div><span className="data-field-label">Tipo</span><span className="mono">{localService.dictionary_data?.type || 'N/D'}</span></div>
+        <div><span className="data-field-label">Verbo</span><span className="mono">{localService.dictionary_data?.verb || 'N/D'}</span></div>
+        <div><span className="data-field-label">Ámbito</span>{localService.dictionary_data?.scope || 'N/D'}</div>
+        <div><span className="data-field-label">Fiabilidad</span>{localService.dictionary_data?.reliability || 'N/D'}</div>
+        <div><span className="data-field-label">Documento</span>{localService.dictionary_data?.source_document || 'N/D'} <span className="mono">v{localService.dictionary_data?.doc_version || '-'}</span></div>
 
         <div className="data-field-block">
           <span className="data-field-label">Uso funcional</span>
-          {localService.dictionary_data?.functional_use || 'N/A'}
+          {localService.dictionary_data?.functional_use || 'N/D'}
         </div>
 
         <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(localService.dictionary_data?.inputs)}</span></div>
@@ -362,16 +367,16 @@ export default function IterationReview({ service, onServiceClosed }) {
       </h3>
 
       <div className="data-grid">
-        <div><span className="data-field-label">App</span><span className="mono">{finalData?.app || 'N/A'}</span></div>
-        <div><span className="data-field-label">Tipo</span><span className="mono">{finalData?.type || 'N/A'}</span></div>
-        <div><span className="data-field-label">Verbo</span><span className="mono">{finalData?.verb || 'N/A'}</span></div>
-        <div><span className="data-field-label">Ámbito</span>{finalData?.scope || 'N/A'}</div>
-        <div><span className="data-field-label">Fiabilidad</span>{finalData?.reliability || 'N/A'}</div>
-        <div><span className="data-field-label">Documento</span>{finalData?.source_document || 'N/A'} <span className="mono">v{finalData?.doc_version || '-'}</span></div>
+        <div><span className="data-field-label">App</span><span className="mono">{finalData?.app || 'N/D'}</span></div>
+        <div><span className="data-field-label">Tipo</span><span className="mono">{finalData?.type || 'N/D'}</span></div>
+        <div><span className="data-field-label">Verbo</span><span className="mono">{finalData?.verb || 'N/D'}</span></div>
+        <div><span className="data-field-label">Ámbito</span>{finalData?.scope || 'N/D'}</div>
+        <div><span className="data-field-label">Fiabilidad</span>{finalData?.reliability || 'N/D'}</div>
+        <div><span className="data-field-label">Documento</span>{finalData?.source_document || 'N/D'} <span className="mono">v{finalData?.doc_version || '-'}</span></div>
 
         <div className="data-field-block">
           <span className="data-field-label">Uso funcional</span>
-          {finalData?.functional_use || 'N/A'}
+          {finalData?.functional_use || 'N/D'}
         </div>
 
         <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(finalData?.inputs)}</span></div>
@@ -426,8 +431,8 @@ export default function IterationReview({ service, onServiceClosed }) {
           <div><label className="data-field-label">Tipo</label>{inp('type')}</div>
           <div><label className="data-field-label">Verbo</label>{inp('verb')}</div>
           <div><label className="data-field-label">Ámbito</label>{inp('scope')}</div>
-          <div><span className="data-field-label">Fiabilidad</span>{finalData?.reliability || 'N/A'}</div>
-          <div><span className="data-field-label">Documento</span>{finalData?.source_document || 'N/A'} <span className="mono">v{finalData?.doc_version || '-'}</span></div>
+          <div><span className="data-field-label">Fiabilidad</span>{finalData?.reliability || 'N/D'}</div>
+          <div><span className="data-field-label">Documento</span>{finalData?.source_document || 'N/D'} <span className="mono">v{finalData?.doc_version || '-'}</span></div>
 
           <div className="wide data-field-block">
             <label className="data-field-label">Uso funcional</label>
@@ -438,7 +443,7 @@ export default function IterationReview({ service, onServiceClosed }) {
               style={{ width: '100%', padding: '4px 7px', fontSize: '13px', border: '1px solid var(--rule)', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
             />
           </div>
-          <div className="wide" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
+          <div className="wide" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
             <ListEditor label="Entradas" items={localEdits.inputs || []} onChange={(v) => setLocalEdits((p) => ({ ...p, inputs: v }))} />
             <ListEditor label="Salidas" items={localEdits.outputs || []} onChange={(v) => setLocalEdits((p) => ({ ...p, outputs: v }))} />
             <ListEditor label="Invoca" items={localEdits.invokes || []} onChange={(v) => setLocalEdits((p) => ({ ...p, invokes: v }))} />
@@ -480,15 +485,15 @@ export default function IterationReview({ service, onServiceClosed }) {
     <div className="data-card accent-primary">
       <h3>Iteración anterior</h3>
       <div className="data-grid">
-        <div><span className="data-field-label">App</span><span className="mono">{previousIteration.data?.app || 'N/A'}</span></div>
-        <div><span className="data-field-label">Tipo</span><span className="mono">{previousIteration.data?.type || 'N/A'}</span></div>
-        <div><span className="data-field-label">Verbo</span><span className="mono">{previousIteration.data?.verb || 'N/A'}</span></div>
-        <div><span className="data-field-label">Ámbito</span>{previousIteration.data?.scope || 'N/A'}</div>
-        <div><span className="data-field-label">Fiabilidad</span>{previousIteration.data?.reliability || 'N/A'}</div>
-        <div><span className="data-field-label">Documento</span>{previousIteration.data?.source_document || 'N/A'} <span className="mono">v{previousIteration.data?.doc_version || '-'}</span></div>
+        <div><span className="data-field-label">App</span><span className="mono">{previousIteration.data?.app || 'N/D'}</span></div>
+        <div><span className="data-field-label">Tipo</span><span className="mono">{previousIteration.data?.type || 'N/D'}</span></div>
+        <div><span className="data-field-label">Verbo</span><span className="mono">{previousIteration.data?.verb || 'N/D'}</span></div>
+        <div><span className="data-field-label">Ámbito</span>{previousIteration.data?.scope || 'N/D'}</div>
+        <div><span className="data-field-label">Fiabilidad</span>{previousIteration.data?.reliability || 'N/D'}</div>
+        <div><span className="data-field-label">Documento</span>{previousIteration.data?.source_document || 'N/D'} <span className="mono">v{previousIteration.data?.doc_version || '-'}</span></div>
         <div className="data-field-block">
           <span className="data-field-label">Uso funcional</span>
-          {previousIteration.data?.functional_use || 'N/A'}
+          {previousIteration.data?.functional_use || 'N/D'}
         </div>
         <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(previousIteration.data?.inputs)}</span></div>
         <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(previousIteration.data?.outputs)}</span></div>
@@ -552,15 +557,15 @@ export default function IterationReview({ service, onServiceClosed }) {
             <div style={{ margin: '18px 0' }}>
               <h4 className="subhead" style={{ marginBottom: '12px' }}>Datos capturados del perímetro</h4>
               <div className="data-grid">
-                <div><span className="data-field-label">App</span><span className="mono">{currentIteration.data.app || 'N/A'}</span></div>
-                <div><span className="data-field-label">Tipo</span><span className="mono">{currentIteration.data.type || 'N/A'}</span></div>
-                <div><span className="data-field-label">Verbo</span><span className="mono">{currentIteration.data.verb || 'N/A'}</span></div>
-                <div><span className="data-field-label">Ámbito</span>{currentIteration.data.scope || 'N/A'}</div>
-                <div><span className="data-field-label">Fiabilidad</span>{currentIteration.data.reliability || 'N/A'}</div>
-                <div><span className="data-field-label">Documento</span>{currentIteration.data.source_document || 'N/A'} <span className="mono">v{currentIteration.data.doc_version || '-'}</span></div>
+                <div><span className="data-field-label">App</span><span className="mono">{currentIteration.data.app || 'N/D'}</span></div>
+                <div><span className="data-field-label">Tipo</span><span className="mono">{currentIteration.data.type || 'N/D'}</span></div>
+                <div><span className="data-field-label">Verbo</span><span className="mono">{currentIteration.data.verb || 'N/D'}</span></div>
+                <div><span className="data-field-label">Ámbito</span>{currentIteration.data.scope || 'N/D'}</div>
+                <div><span className="data-field-label">Fiabilidad</span>{currentIteration.data.reliability || 'N/D'}</div>
+                <div><span className="data-field-label">Documento</span>{currentIteration.data.source_document || 'N/D'} <span className="mono">v{currentIteration.data.doc_version || '-'}</span></div>
                 <div className="data-field-block">
                   <span className="data-field-label">Uso funcional</span>
-                  {currentIteration.data.functional_use || 'N/A'}
+                  {currentIteration.data.functional_use || 'N/D'}
                 </div>
                 <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(currentIteration.data.inputs)}</span></div>
                 <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(currentIteration.data.outputs)}</span></div>
@@ -719,16 +724,16 @@ export default function IterationReview({ service, onServiceClosed }) {
             </p>
 
             <div className="data-grid">
-              <div><span className="data-field-label">App</span><span className="mono">{previewData.app || 'N/A'}</span></div>
-              <div><span className="data-field-label">Tipo</span><span className="mono">{previewData.type || 'N/A'}</span></div>
-              <div><span className="data-field-label">Verbo</span><span className="mono">{previewData.verb || 'N/A'}</span></div>
-              <div><span className="data-field-label">Ámbito</span>{previewData.scope || 'N/A'}</div>
-              <div><span className="data-field-label">Fiabilidad</span>{previewData.reliability || 'N/A'}</div>
-              <div><span className="data-field-label">Documento</span>{previewData.source_document || 'N/A'} <span className="mono">v{previewData.doc_version || '-'}</span></div>
+              <div><span className="data-field-label">App</span><span className="mono">{previewData.app || 'N/D'}</span></div>
+              <div><span className="data-field-label">Tipo</span><span className="mono">{previewData.type || 'N/D'}</span></div>
+              <div><span className="data-field-label">Verbo</span><span className="mono">{previewData.verb || 'N/D'}</span></div>
+              <div><span className="data-field-label">Ámbito</span>{previewData.scope || 'N/D'}</div>
+              <div><span className="data-field-label">Fiabilidad</span>{previewData.reliability || 'N/D'}</div>
+              <div><span className="data-field-label">Documento</span>{previewData.source_document || 'N/D'} <span className="mono">v{previewData.doc_version || '-'}</span></div>
 
               <div className="data-field-block">
                 <span className="data-field-label">Uso funcional</span>
-                {previewData.functional_use || 'N/A'}
+                {previewData.functional_use || 'N/D'}
               </div>
 
               <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(previewData.inputs)}</span></div>

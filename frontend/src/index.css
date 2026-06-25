@@ -606,3 +606,66 @@ button:disabled {
     animation-iteration-count: 1;
   }
 }
+
+/* Items dentro de un ListEditor: 2 columnas cuando el contenedor lo permite, 1 si no */
+.list-editor-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 4px;
+  margin-top: 2px;
+}
+
+/* =========================================
+   RESPONSIVE
+========================================= */
+
+/* Tablet: los dos paneles se apilan verticalmente */
+@media (max-width: 900px) {
+  .container {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    height: auto;
+    min-height: 100vh;
+  }
+}
+
+/* Móvil: espaciados reducidos, comparación de conflictos en columna única */
+@media (max-width: 600px) {
+  .container {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .panel {
+    padding: 16px;
+  }
+
+  .data-card {
+    padding: 14px;
+  }
+
+  .field-values {
+    grid-template-columns: 1fr;
+  }
+
+  .field-values::before {
+    display: none;
+  }
+
+  .value-box {
+    padding: 4px 0;
+  }
+
+  .field-diff {
+    padding: 12px;
+  }
+
+  .conflict-block {
+    padding: 10px 12px;
+  }
+
+  .buttons {
+    flex-wrap: wrap;
+  }
+
+}

@@ -91,12 +91,18 @@ function splitDocumentVersion(value) {
   return [stripChars(match[1], ' -|'), match[2]];
 }
 
+function isNDPlaceholder(v) {
+  const s = (v ?? '').toString().trim().toLowerCase();
+  return s === 'n/d' || s === 'n/a';
+}
+
 function getField(columnsLower, namesList, defaultValue = '') {
   for (const name of namesList) {
     const key = name.toLowerCase().trim();
     if (key in columnsLower) {
       const value = columnsLower[key];
-      return value ? String(value).trim() : defaultValue;
+      const trimmed = String(value).trim();
+      return (trimmed && !isNDPlaceholder(trimmed)) ? trimmed : defaultValue;
     }
   }
   return defaultValue;
@@ -105,7 +111,7 @@ function getField(columnsLower, namesList, defaultValue = '') {
 function parseListField(columnsLower, namesList, defaultValue = []) {
   const value = getField(columnsLower, namesList, '');
   if (!value) return defaultValue;
-  return value.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+  return value.split(/[,;]/).map((s) => s.trim()).filter((s) => s && !isNDPlaceholder(s));
 }
 
 /** Convierte un registro (fila como objeto) en un ExcelRowData, con mapeo
