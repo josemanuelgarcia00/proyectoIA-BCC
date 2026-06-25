@@ -4,6 +4,7 @@ import * as servicesApi from '../api/servicesApi';
 export default function SaveSelector({ services, loading, onSaved }) {
   const [selected, setSelected] = useState(new Set());
   const [saving, setSaving] = useState(false);
+  const [onlyReviewed, setOnlyReviewed] = useState(false);
 
   // Elegible = el usuario tomó una decisión explícita sobre él (aceptar y
   // cerrar, o rechazar) y ya no tiene conflictos. Un servicio NUEVO sin
@@ -67,12 +68,19 @@ export default function SaveSelector({ services, loading, onSaved }) {
         queda pendiente para una próxima vez.
       </p>
 
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button className="btn-quiet" onClick={() => setSelected(new Set(eligible.map(s => s.service_name)))}>
           Seleccionar todos los listos
         </button>
         <button className="btn-quiet" onClick={() => setSelected(new Set())}>
           Deseleccionar todos
+        </button>
+        <button
+          className="btn-quiet"
+          style={{ color: onlyReviewed ? 'var(--primary-dark)' : undefined, borderColor: onlyReviewed ? 'var(--primary-dark)' : undefined }}
+          onClick={() => setOnlyReviewed(v => !v)}
+        >
+          {onlyReviewed ? 'Ver todos' : 'Ver solo revisados'}
         </button>
         <button
           className="btn-header"
@@ -85,7 +93,7 @@ export default function SaveSelector({ services, loading, onSaved }) {
       </div>
 
       <div>
-        {services.map(s => {
+        {(onlyReviewed ? eligible : services).map(s => {
           const eligibleRow = isEligible(s);
           const reason = s.requires_attention
             ? ' · tiene conflictos pendientes'

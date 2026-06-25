@@ -255,7 +255,7 @@ export function extractServicesFromRecords(dictionaryRecords, perimeterRecords) 
     services.push(createServiceEntity({
       name: serviceName,
       exists_in_dictionary: masterData ? 'Si' : 'No',
-      consolidated_status: hasConflicts ? 'En revision' : 'Aceptado',
+      consolidated_status: unchangedExisting ? 'Aceptado' : 'En revision',
       winning_data: masterData,
       perimeter_iterations: iterations,
       closed: unchangedExisting,
