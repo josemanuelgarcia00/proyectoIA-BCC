@@ -21,15 +21,9 @@ function ListEditor({ items, onChange, label, error, onBlur }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-        <button
-          type="button"
-          onClick={() => onChange([...list, ''])}
-          title="Añadir"
-          style={{ flexShrink: 0, width: '18px', height: '18px', cursor: 'pointer', border: '1px solid var(--primary-dark)', borderRadius: '2px', background: 'var(--primary)', color: 'white', fontWeight: 700, fontSize: '13px', lineHeight: 1, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >+</button>
-        <span className="data-field-label" style={{ margin: 0 }}>{label || ''}</span>
-      </div>
+      {label ? (
+        <span className="data-field-label" style={{ margin: 0, marginBottom: '4px' }}>{label}</span>
+      ) : null}
       {list.length === 0 && (
         <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic' }}>N/D</span>
       )}
@@ -60,6 +54,11 @@ function ListEditor({ items, onChange, label, error, onBlur }) {
           );
         })}
       </div>
+      <button
+        type="button"
+        onClick={() => onChange([...list, ''])}
+        style={{ alignSelf: 'flex-start', marginTop: '4px', padding: '3px 10px', fontSize: '12px', cursor: 'pointer', border: '1px dashed var(--primary-dark)', borderRadius: '2px', background: 'transparent', color: 'var(--primary-dark)', fontWeight: 600, lineHeight: 1.5 }}
+      >+ Añadir</button>
       {error && (
         <span className={error.startsWith('__warning__') ? 'field-warning-msg' : 'field-error-msg'}>
           {error.replace('__warning__', '')}
@@ -224,6 +223,148 @@ function ListFieldsBlock({ data }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+const ALL_FIELDS = [
+  { key: 'app',              label: 'App',                  inputType: 'app'      },
+  { key: 'type',             label: 'Tipo',                 inputType: 'enum'     },
+  { key: 'verb',             label: 'Verbo',                inputType: 'enum'     },
+  { key: 'scope',            label: 'Ámbito',               inputType: 'text'     },
+  { key: 'reliability',      label: 'Fiabilidad',           inputType: 'readonly' },
+  { key: 'source_document',  label: 'Documento',            inputType: 'readonly' },
+  { key: 'functional_use',   label: 'Uso funcional',        inputType: 'textarea' },
+  { key: 'inputs',           label: 'Entradas',             inputType: 'list'     },
+  { key: 'outputs',          label: 'Salidas',              inputType: 'list'     },
+  { key: 'invokes',          label: 'Invoca',               inputType: 'list'     },
+  { key: 'reference_tables', label: 'Tablas referenciales', inputType: 'list'     },
+];
+
+function CompareTable({ iterationData, dictionaryData, conflicts, localEdits, setLocalEdits, validationErrors, setValidationErrors, hasPrevious }) {
+  const conflictKeys = new Set((conflicts || []).map(c =>
+    (c.column === 'document' || c.column === 'doc_version') ? 'source_document' : c.column
+  ));
+  const hasLeftCol = !!dictionaryData;
+
+  const renderDisplayValue = (key, data, inputType) => {
+    if (!data) return <span className="pill-empty">N/D</span>;
+    if (inputType === 'list') {
+      const vals = Array.isArray(data[key]) ? data[key] : [];
+      if (!vals.length) return <span className="pill-empty">N/D</span>;
+      return (
+        <div className="list-pills" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: '4px' }}>
+          {vals.map((v, i) => <span key={i} className="data-pill">{v}</span>)}
+        </div>
+      );
+    }
+    if (key === 'source_document') {
+      return <span>{data.source_document || 'N/D'} <span className="mono" style={{ fontSize: '11px' }}>v{data.doc_version || '-'}</span></span>;
+    }
+    const val = data[key];
+    const useMono = inputType === 'app' || inputType === 'enum';
+    return <span className={useMono ? 'mono' : ''}>{val || 'N/D'}</span>;
+  };
+
+  const renderEditControl = (key, inputType) => {
+    const errMsg = validationErrors[key];
+    const isWarning = errMsg?.startsWith('__warning__');
+    const hasError = !!errMsg && !isWarning;
+    const cls = hasError ? 'input-error' : isWarning ? 'input-warning' : '';
+    const setVal = (v) => setLocalEdits(p => ({ ...p, [key]: v }));
+    const onBlur = () => {
+      const val = (localEdits[key] || '').trim();
+      if (val && !(key === 'app' && !/^[A-Z]{3}$/.test(val))) {
+        setValidationErrors(p => ({ ...p, [key]: null }));
+      }
+    };
+
+    if (inputType === 'list') {
+      return (
+        <ListEditor
+          label=""
+          items={localEdits[key] || []}
+          onChange={v => setVal(v)}
+          error={validationErrors[key]}
+          onBlur={() => setValidationErrors(p => ({ ...p, [key]: null }))}
+        />
+      );
+    }
+
+    let control;
+    if (inputType === 'app') {
+      control = <AppCodeInput value={localEdits[key] ?? ''} onChange={setVal} onBlur={onBlur} className={cls} />;
+    } else if (inputType === 'enum') {
+      control = <FixedSelect value={localEdits[key] ?? ''} onChange={setVal} onBlur={onBlur} options={FIELD_ENUM_OPTIONS[key] || []} className={cls} />;
+    } else if (inputType === 'textarea') {
+      control = (
+        <textarea
+          rows={3}
+          value={localEdits[key] ?? ''}
+          onChange={e => setVal(e.target.value)}
+          onBlur={() => { if ((localEdits[key] || '').trim()) setValidationErrors(p => ({ ...p, [key]: null })); }}
+          className={cls}
+          style={{ ...FIELD_INPUT_STYLE, resize: 'vertical' }}
+        />
+      );
+    } else {
+      control = (
+        <input type="text" value={localEdits[key] ?? ''} onChange={e => setVal(e.target.value)}
+          onBlur={onBlur} className={cls} style={FIELD_INPUT_STYLE} />
+      );
+    }
+    return (
+      <>
+        {control}
+        {errMsg && (
+          <span className={isWarning ? 'field-warning-msg' : 'field-error-msg'}>
+            {errMsg.replace('__warning__', '')}
+          </span>
+        )}
+      </>
+    );
+  };
+
+  const leftLabel = hasPrevious ? 'Iteración anterior' : 'Diccionario maestro';
+
+  return (
+    <div className={`compare-table${hasLeftCol ? '' : ' compare-table--2col'}`}>
+      <div className="compare-header">
+        <span className="compare-header-cell">Campo</span>
+        {hasLeftCol && <span className="compare-header-cell">{leftLabel}</span>}
+        <span className="compare-header-cell">Propuesta del perímetro</span>
+      </div>
+      {ALL_FIELDS.map(({ key, label, inputType }) => {
+        const isDiff = conflictKeys.has(key);
+        const isReadonly = inputType === 'readonly';
+        const isWide = inputType === 'textarea' || inputType === 'list';
+        const rowClass = `compare-row compare-row--${isDiff ? 'diff' : 'equal'}${isWide ? ' compare-row--wide' : ''}`;
+        const leftCell = hasLeftCol ? renderDisplayValue(key, dictionaryData, inputType) : null;
+        const rightCell = (isDiff && !isReadonly)
+          ? renderEditControl(key, inputType)
+          : renderDisplayValue(key, iterationData, inputType);
+
+        if (isWide) {
+          return (
+            <div key={key} className={rowClass}>
+              <span className="compare-col-label">{label}</span>
+              {hasLeftCol ? (
+                <div className="compare-wide-values">
+                  <div>{leftCell}</div>
+                  <div>{rightCell}</div>
+                </div>
+              ) : <div>{rightCell}</div>}
+            </div>
+          );
+        }
+        return (
+          <div key={key} className={rowClass}>
+            <span className="compare-col-label">{label}</span>
+            {hasLeftCol && <div>{leftCell}</div>}
+            <div>{rightCell}</div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -821,10 +962,6 @@ export default function IterationReview({ service, onServiceClosed }) {
         )
       ) : (
         <>
-          {!isNewService
-            ? <div style={{ marginBottom: '24px' }}>{dictionaryBox}</div>
-            : previousIteration && <div style={{ marginBottom: '24px' }}>{previousIterationBox}</div>
-          }
           {currentIteration && (
           <div key={currentIteration.iteration_id} className="field-diff">
 
@@ -836,201 +973,45 @@ export default function IterationReview({ service, onServiceClosed }) {
               <span className="folio-count">Punto {currentPosition} de {totalConflictIterations}</span>
             </div>
 
-            {/* Datos de la iteración — solo lectura */}
-            <div style={{ margin: '18px 0' }}>
-              <h4 className="subhead" style={{ marginBottom: '12px' }}>Datos capturados del perímetro</h4>
-              <div className="data-grid">
-                <div><span className="data-field-label">App</span><span className="mono">{currentIteration.data.app || 'N/D'}</span></div>
-                <div><span className="data-field-label">Tipo</span><span className="mono">{currentIteration.data.type || 'N/D'}</span></div>
-                <div><span className="data-field-label">Verbo</span><span className="mono">{currentIteration.data.verb || 'N/D'}</span></div>
-                <div><span className="data-field-label">Ámbito</span>{currentIteration.data.scope || 'N/D'}</div>
-                <div><span className="data-field-label">Fiabilidad</span>{currentIteration.data.reliability || 'N/D'}</div>
-                <div><span className="data-field-label">Documento</span>{currentIteration.data.source_document || 'N/D'} <span className="mono">v{currentIteration.data.doc_version || '-'}</span></div>
-                <div className="data-field-block">
-                  <span className="data-field-label">Uso funcional</span>
-                  {currentIteration.data.functional_use || 'N/D'}
-                </div>
-                <ListFieldsBlock data={currentIteration.data} />
+            <CompareTable
+              iterationData={currentIteration.data}
+              dictionaryData={isNewService ? (previousIteration?.data ?? null) : localService.dictionary_data}
+              conflicts={currentIteration.conflicts}
+              localEdits={localEdits}
+              setLocalEdits={setLocalEdits}
+              validationErrors={validationErrors}
+              setValidationErrors={setValidationErrors}
+              hasPrevious={isNewService && !!previousIteration}
+            />
+
+            <div className="buttons" style={{ marginTop: '16px', justifyContent: 'space-between' }}>
+              <button
+                className="btn-quiet"
+                disabled={savingEdits}
+                onClick={() => saveIterationEdits(currentIteration.iteration_id)}
+                style={{ flex: 'none' }}
+              >
+                {savingEdits ? 'Guardando...' : 'Guardar estado'}
+              </button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  className="btn-reject"
+                  disabled={resolvingId === currentIteration.iteration_id}
+                  onClick={() => rejectIterationWithConfirm(currentIteration.iteration_id)}
+                >
+                  {resolvingId === currentIteration.iteration_id ? 'Aplicando...' : 'Rechazar'}
+                </button>
+                <button
+                  className="btn-unify"
+                  disabled={resolvingId === currentIteration.iteration_id}
+                  onClick={() => resolveIteration(currentIteration.iteration_id, 'unify')}
+                >
+                  {resolvingId === currentIteration.iteration_id ? 'Aplicando...' : 'Unificar'}
+                </button>
               </div>
             </div>
 
-            {/* Mapeo de Conflictos */}
-            <div className="conflict-block">
-                <h4 className="subhead" style={{ marginBottom: '16px' }}>
-                  Conflictos detectados ({currentIteration.conflicts.length})
-                </h4>
-
-                {(() => {
-                  const EDITABLE_FIELDS = new Set(['app','type','verb','scope','functional_use','inputs','outputs','invokes','reference_tables']);
-                  const LIST_FIELDS = new Set(['inputs','outputs','invokes','reference_tables']);
-                  const FIELD_LABELS = {
-                    document: 'documento + versión',
-                    reliability: 'fiabilidad',
-                    app: 'app',
-                    type: 'tipo',
-                    verb: 'verbo',
-                    scope: 'ámbito',
-                    functional_use: 'uso funcional',
-                    inputs: 'entradas',
-                    outputs: 'salidas',
-                    invokes: 'invoca',
-                    reference_tables: 'tablas referenciales',
-                  };
-                  return currentIteration.conflicts.map((conflict, idx) => {
-                    const isEditable = EDITABLE_FIELDS.has(conflict.column);
-                    const isList = LIST_FIELDS.has(conflict.column);
-                    return (
-                      <div key={idx} className="conflict-row">
-                        <div className="field-name">
-                          <span className="mono">{FIELD_LABELS[conflict.column] ?? conflict.column}</span>
-                        </div>
-
-                        {conflict.original ? (
-                          /* Diff real: hay valor anterior → layout dos columnas */
-                          <div className="field-values">
-                            <div className="value-box">
-                              <div className="label">Valor anterior</div>
-                              {isList ? (
-                                <div className="list-pills" style={{ marginTop: '4px' }}>
-                                  {conflict.original.split(', ').filter(Boolean).map((v, i) => (
-                                    <span key={i} className="data-pill" style={{ opacity: 0.7 }}>{v.trim()}</span>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div style={{ color: 'var(--text-muted)' }}>{conflict.original}</div>
-                              )}
-                            </div>
-                            <div className="value-box">
-                              {isEditable && isList ? (
-                                <ListEditor
-                                  label="Nueva propuesta"
-                                  items={localEdits[conflict.column] || []}
-                                  onChange={(v) => setLocalEdits((p) => ({ ...p, [conflict.column]: v }))}
-                                  error={validationErrors[conflict.column]}
-                                  onBlur={() => setValidationErrors((prev) => ({ ...prev, [conflict.column]: null }))}
-                                />
-                              ) : <div className="label">Nueva propuesta</div>}
-                              {isEditable && !isList && (() => {
-                                const col = conflict.column;
-                                const enumOpts = FIELD_ENUM_OPTIONS[col];
-                                const hasErr = !!validationErrors[col];
-                                const cls = hasErr ? 'input-error' : '';
-                                const setVal = (v) => setLocalEdits((p) => ({ ...p, [col]: v }));
-                                const onBlurConflict = () => {
-                                  const val = (localEdits[col] || '').trim();
-                                  if (val && !(col === 'app' && !/^[A-Z]{3}$/.test(val))) {
-                                    setValidationErrors((prev) => ({ ...prev, [col]: null }));
-                                  }
-                                };
-                                let control;
-                                if (col === 'app') {
-                                  control = <AppCodeInput value={localEdits[col] ?? ''} onChange={setVal} onBlur={onBlurConflict} className={cls} />;
-                                } else if (enumOpts) {
-                                  control = <FixedSelect value={localEdits[col] ?? ''} onChange={setVal} onBlur={onBlurConflict} options={enumOpts} className={cls} />;
-                                } else {
-                                  control = <input type="text" value={localEdits[col] ?? ''} onChange={(e) => setVal(e.target.value)} onBlur={onBlurConflict} className={cls} style={FIELD_INPUT_STYLE} />;
-                                }
-                                return (
-                                  <>
-                                    {control}
-                                    {hasErr && <span className="field-error-msg">{validationErrors[col]}</span>}
-                                  </>
-                                );
-                              })()}
-                              {!isEditable && (
-                                <div style={{ color: 'var(--ink)', fontWeight: 600 }}>
-                                  {conflict.proposed}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          /* Sin valor previo → columna única, sin comparación */
-                          <div style={{ paddingTop: '6px' }}>
-                            <div className="label" style={{ marginBottom: '8px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                              Campo nuevo — sin valor previo en el diccionario
-                            </div>
-                            {isEditable && isList ? (
-                              <ListEditor
-                                label="Valor propuesto"
-                                items={localEdits[conflict.column] || []}
-                                onChange={(v) => setLocalEdits((p) => ({ ...p, [conflict.column]: v }))}
-                                error={validationErrors[conflict.column]}
-                                onBlur={() => setValidationErrors((prev) => ({ ...prev, [conflict.column]: null }))}
-                              />
-                            ) : null}
-                            {isEditable && !isList && (() => {
-                              const col = conflict.column;
-                              const enumOpts = FIELD_ENUM_OPTIONS[col];
-                              const hasErr = !!validationErrors[col];
-                              const cls = hasErr ? 'input-error' : '';
-                              const setVal = (v) => setLocalEdits((p) => ({ ...p, [col]: v }));
-                              const onBlurConflict = () => {
-                                const val = (localEdits[col] || '').trim();
-                                if (!val) {
-                                  setValidationErrors((prev) => ({ ...prev, [col]: 'El campo no puede estar vacío' }));
-                                } else if (col === 'app' && !/^[A-Z]{3}$/.test(val)) {
-                                  setValidationErrors((prev) => ({ ...prev, [col]: 'El código de app debe tener exactamente 3 letras' }));
-                                } else {
-                                  setValidationErrors((prev) => ({ ...prev, [col]: null }));
-                                }
-                              };
-                              let control;
-                              if (col === 'app') {
-                                control = <AppCodeInput value={localEdits[col] ?? ''} onChange={setVal} onBlur={onBlurConflict} className={cls} />;
-                              } else if (enumOpts) {
-                                control = <FixedSelect value={localEdits[col] ?? ''} onChange={setVal} onBlur={onBlurConflict} options={enumOpts} className={cls} />;
-                              } else {
-                                control = <input type="text" value={localEdits[col] ?? ''} onChange={(e) => setVal(e.target.value)} onBlur={onBlurConflict} className={cls} style={FIELD_INPUT_STYLE} />;
-                              }
-                              return (
-                                <>
-                                  {control}
-                                  {hasErr && <span className="field-error-msg">{validationErrors[col]}</span>}
-                                </>
-                              );
-                            })()}
-                            {!isEditable && (
-                              <div style={{ color: 'var(--ink)', fontWeight: 600 }}>
-                                {conflict.proposed}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  });
-                })()}
-
-                <div className="buttons" style={{ justifyContent: 'space-between' }}>
-                  <button
-                    className="btn-quiet"
-                    disabled={savingEdits}
-                    onClick={() => saveIterationEdits(currentIteration.iteration_id)}
-                    style={{ flex: 'none' }}
-                  >
-                    {savingEdits ? 'Guardando...' : 'Guardar estado'}
-                  </button>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button
-                      className="btn-reject"
-                      disabled={resolvingId === currentIteration.iteration_id}
-                      onClick={() => rejectIterationWithConfirm(currentIteration.iteration_id)}
-                    >
-                      {resolvingId === currentIteration.iteration_id ? 'Aplicando...' : 'Rechazar'}
-                    </button>
-                    <button
-                      className="btn-unify"
-                      disabled={resolvingId === currentIteration.iteration_id}
-                      onClick={() => resolveIteration(currentIteration.iteration_id, 'unify')}
-                    >
-                      {resolvingId === currentIteration.iteration_id ? 'Aplicando...' : 'Unificar'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-            </div>
+          </div>
           )}
         </>
       )}
