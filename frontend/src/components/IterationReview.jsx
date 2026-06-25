@@ -1,6 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import * as servicesApi from '../api/servicesApi';
 
+function ListEditor({ items, onChange, label }) {
+  const list = Array.isArray(items) ? items : [];
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => onChange([...list, ''])}
+        title="Añadir"
+        style={{ position: 'absolute', top: 0, right: 0, width: '18px', height: '18px', cursor: 'pointer', border: '1px solid #2e7d32', borderRadius: '2px', background: '#2e7d32', color: 'white', fontWeight: 700, fontSize: '13px', lineHeight: 1, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      >+</button>
+      <span className="data-field-label" style={{ margin: 0, marginBottom: '4px', paddingRight: '22px' }}>{label || ''}</span>
+      {list.map((item, idx) => (
+        <div key={idx} style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <input
+            type="text"
+            value={item}
+            onChange={(e) => {
+              const next = [...list];
+              next[idx] = e.target.value;
+              onChange(next);
+            }}
+            style={{ width: '80%', padding: '4px 7px', fontSize: '13px', border: '1px solid var(--rule)', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+          />
+          <button
+            type="button"
+            onClick={() => onChange(list.filter((_, i) => i !== idx))}
+            title="Eliminar"
+            style={{ width: '20%', padding: '2px 4px', fontSize: '10px', lineHeight: 1, cursor: 'pointer', border: '1px solid var(--rule)', borderRadius: '2px', background: 'white', color: 'var(--rust, #c0392b)' }}
+          >Eliminar</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const STATUS_STAMP = {
   'Aceptado': 'stamp-moss',
   'Unificado': 'stamp-moss',
@@ -25,10 +60,10 @@ export default function IterationReview({ service, onServiceClosed }) {
     verb: data.verb || '',
     scope: data.scope || '',
     functional_use: data.functional_use || '',
-    inputs: (data.inputs || []).join('; '),
-    outputs: (data.outputs || []).join('; '),
-    invokes: (data.invokes || []).join('; '),
-    reference_tables: (data.reference_tables || []).join('; '),
+    inputs: data.inputs || [],
+    outputs: data.outputs || [],
+    invokes: data.invokes || [],
+    reference_tables: data.reference_tables || [],
   });
 
   // Cuando se selecciona otro servicio en la lista, reiniciamos el estado local
@@ -179,16 +214,17 @@ export default function IterationReview({ service, onServiceClosed }) {
   const saveIterationEdits = async (iterationId) => {
     setSavingEdits(true);
     try {
+      const toArr = (v) => Array.isArray(v) ? v.filter(Boolean) : (v || '').split(/[;,]/).map((s) => s.trim()).filter(Boolean);
       const dataToSave = {
         app: localEdits.app,
         type: localEdits.type,
         verb: localEdits.verb,
         scope: localEdits.scope,
         functional_use: localEdits.functional_use,
-        inputs: localEdits.inputs.split(/[;,]/).map((s) => s.trim()).filter(Boolean),
-        outputs: localEdits.outputs.split(/[;,]/).map((s) => s.trim()).filter(Boolean),
-        invokes: localEdits.invokes.split(/[;,]/).map((s) => s.trim()).filter(Boolean),
-        reference_tables: localEdits.reference_tables.split(/[;,]/).map((s) => s.trim()).filter(Boolean),
+        inputs: toArr(localEdits.inputs),
+        outputs: toArr(localEdits.outputs),
+        invokes: toArr(localEdits.invokes),
+        reference_tables: toArr(localEdits.reference_tables),
       };
       const updated = await servicesApi.updateIterationData(localService.service_name, iterationId, dataToSave);
       setLocalService(updated);
@@ -364,14 +400,6 @@ export default function IterationReview({ service, onServiceClosed }) {
         style={{ width: '100%', padding: '4px 7px', fontSize: '13px', border: '1px solid var(--rule)', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box' }}
       />
     );
-    const ta = (field, rows = 2) => (
-      <textarea
-        rows={rows}
-        value={localEdits[field] ?? ''}
-        onChange={(e) => setLocalEdits((p) => ({ ...p, [field]: e.target.value }))}
-        style={{ width: '100%', padding: '4px 7px', fontSize: '13px', border: '1px solid var(--rule)', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
-      />
-    );
     return (
       <div className="data-card">
         <h3>Datos del servicio</h3>
@@ -386,37 +414,46 @@ export default function IterationReview({ service, onServiceClosed }) {
 
           <div className="wide data-field-block">
             <label className="data-field-label">Uso funcional</label>
-            {ta('functional_use', 3)}
+            <textarea
+              rows={3}
+              value={localEdits.functional_use ?? ''}
+              onChange={(e) => setLocalEdits((p) => ({ ...p, functional_use: e.target.value }))}
+              style={{ width: '100%', padding: '4px 7px', fontSize: '13px', border: '1px solid var(--rule)', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+            />
           </div>
-          <div className="wide"><label className="data-field-label">Entradas <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(separar con ;)</span></label>{ta('inputs')}</div>
-          <div className="wide"><label className="data-field-label">Salidas <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(separar con ;)</span></label>{ta('outputs')}</div>
-          <div className="wide"><label className="data-field-label">Invoca <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(separar con ;)</span></label>{ta('invokes')}</div>
-          <div className="wide"><label className="data-field-label">Tablas referenciales <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(separar con ;)</span></label>{ta('reference_tables')}</div>
+          <div className="wide" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
+            <ListEditor label="Entradas" items={localEdits.inputs || []} onChange={(v) => setLocalEdits((p) => ({ ...p, inputs: v }))} />
+            <ListEditor label="Salidas" items={localEdits.outputs || []} onChange={(v) => setLocalEdits((p) => ({ ...p, outputs: v }))} />
+            <ListEditor label="Invoca" items={localEdits.invokes || []} onChange={(v) => setLocalEdits((p) => ({ ...p, invokes: v }))} />
+            <ListEditor label="Tablas referenciales" items={localEdits.reference_tables || []} onChange={(v) => setLocalEdits((p) => ({ ...p, reference_tables: v }))} />
+          </div>
         </div>
 
-        <div className="buttons" style={{ marginTop: '20px' }}>
+        <div className="buttons" style={{ marginTop: '20px', justifyContent: 'space-between' }}>
           <button
             className="btn-quiet"
             disabled={savingEdits}
             onClick={() => saveIterationEdits(lastIteration.iteration_id)}
             style={{ fontSize: '12px', padding: '4px 12px' }}
           >
-            {savingEdits ? 'Guardando...' : 'Guardar cambios'}
+            {savingEdits ? 'Guardando...' : 'Mantener estado'}
           </button>
-          <button
-            className="btn-accept"
-            disabled={resolvingId === 'accept-close'}
-            onClick={requestAcceptPreview}
-          >
-            {resolvingId === 'accept-close' ? 'Calculando...' : 'Aceptar'}
-          </button>
-          <button
-            className="btn-reject"
-            disabled={resolvingId === 'reject-service'}
-            onClick={rejectService}
-          >
-            {resolvingId === 'reject-service' ? 'Aplicando...' : 'Rechazar'}
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              className="btn-accept"
+              disabled={resolvingId === 'accept-close'}
+              onClick={requestAcceptPreview}
+            >
+              {resolvingId === 'accept-close' ? 'Calculando...' : 'Aceptar'}
+            </button>
+            <button
+              className="btn-reject"
+              disabled={resolvingId === 'reject-service'}
+              onClick={rejectService}
+            >
+              {resolvingId === 'reject-service' ? 'Aplicando...' : 'Rechazar'}
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -553,24 +590,22 @@ export default function IterationReview({ service, onServiceClosed }) {
                             </div>
                           </div>
                           <div className="value-box">
-                            <div className="label">Nueva propuesta</div>
-                            {isEditable ? (
-                              isList ? (
-                                <textarea
-                                  rows={2}
-                                  value={localEdits[conflict.column] ?? ''}
-                                  onChange={(e) => setLocalEdits((p) => ({ ...p, [conflict.column]: e.target.value }))}
-                                  style={{ width: '100%', padding: '4px 7px', fontSize: '13px', border: '1px solid var(--rule)', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
-                                />
-                              ) : (
-                                <input
-                                  type="text"
-                                  value={localEdits[conflict.column] ?? ''}
-                                  onChange={(e) => setLocalEdits((p) => ({ ...p, [conflict.column]: e.target.value }))}
-                                  style={{ width: '100%', padding: '4px 7px', fontSize: '13px', border: '1px solid var(--rule)', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                                />
-                              )
-                            ) : (
+                            {isEditable && isList ? (
+                              <ListEditor
+                                label="Nueva propuesta"
+                                items={localEdits[conflict.column] || []}
+                                onChange={(v) => setLocalEdits((p) => ({ ...p, [conflict.column]: v }))}
+                              />
+                            ) : <div className="label">Nueva propuesta</div>}
+                            {isEditable && !isList && (
+                              <input
+                                type="text"
+                                value={localEdits[conflict.column] ?? ''}
+                                onChange={(e) => setLocalEdits((p) => ({ ...p, [conflict.column]: e.target.value }))}
+                                style={{ width: '100%', padding: '4px 7px', fontSize: '13px', border: '1px solid var(--rule)', borderRadius: '2px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                              />
+                            )}
+                            {!isEditable && (
                               <div style={{ color: 'var(--ink)', fontWeight: 600 }}>
                                 {conflict.proposed || 'N/D'}
                               </div>
@@ -582,29 +617,31 @@ export default function IterationReview({ service, onServiceClosed }) {
                   });
                 })()}
 
-                <div className="buttons">
+                <div className="buttons" style={{ justifyContent: 'space-between' }}>
                   <button
                     className="btn-quiet"
                     disabled={savingEdits}
                     onClick={() => saveIterationEdits(currentIteration.iteration_id)}
                     style={{ fontSize: '12px', padding: '4px 12px' }}
                   >
-                    {savingEdits ? 'Guardando...' : 'Guardar cambios'}
+                    {savingEdits ? 'Guardando...' : 'Mantener estado'}
                   </button>
-                  <button
-                    className="btn-unify"
-                    disabled={resolvingId === currentIteration.iteration_id}
-                    onClick={() => resolveIteration(currentIteration.iteration_id, 'unify')}
-                  >
-                    {resolvingId === currentIteration.iteration_id ? 'Aplicando...' : 'Unificar'}
-                  </button>
-                  <button
-                    className="btn-reject"
-                    disabled={resolvingId === currentIteration.iteration_id}
-                    onClick={() => rejectIterationWithConfirm(currentIteration.iteration_id)}
-                  >
-                    {resolvingId === currentIteration.iteration_id ? 'Aplicando...' : 'Rechazar cambios'}
-                  </button>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      className="btn-unify"
+                      disabled={resolvingId === currentIteration.iteration_id}
+                      onClick={() => resolveIteration(currentIteration.iteration_id, 'unify')}
+                    >
+                      {resolvingId === currentIteration.iteration_id ? 'Aplicando...' : 'Unificar'}
+                    </button>
+                    <button
+                      className="btn-reject"
+                      disabled={resolvingId === currentIteration.iteration_id}
+                      onClick={() => rejectIterationWithConfirm(currentIteration.iteration_id)}
+                    >
+                      {resolvingId === currentIteration.iteration_id ? 'Aplicando...' : 'Rechazar cambios'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
