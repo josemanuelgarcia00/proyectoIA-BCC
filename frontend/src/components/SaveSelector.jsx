@@ -83,8 +83,8 @@ export default function SaveSelector({ services, loading, onSaved }) {
           {onlyReviewed ? 'Ver todos' : 'Ver solo revisados'}
         </button>
         <button
-          className="btn-header"
-          style={{ marginLeft: 'auto', flex: 'none', color: 'var(--ink)', borderColor: 'var(--rule-strong)' }}
+          className="btn-accept"
+          style={{ marginLeft: 'auto', flex: 'none' }}
           onClick={handleSave}
           disabled={saving || selected.size === 0}
         >

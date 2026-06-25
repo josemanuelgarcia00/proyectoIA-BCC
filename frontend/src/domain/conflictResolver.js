@@ -99,6 +99,15 @@ export function resolveIteration(service, iterationId, resolution = 'unify') {
   iteration.conflicts = [];
   iteration.resolution = resolution;
 
+  // Los campos lista sin conflicto explícito (N/D en el perímetro) no son
+  // tocados por el bucle anterior, pero su array vacío no debe romper la
+  // cadena de acumulación. Aplicar mergeValues sobre todos los campos lista
+  // garantiza que el contenido de la línea base siempre se arrastre.
+  for (const fieldName of LIST_FIELDS) {
+    const baselineVal = baselineData ? (baselineData[fieldName] || []) : [];
+    iteration.data[fieldName] = mergeValues(baselineVal, iteration.data[fieldName], fieldName);
+  }
+
   // Recalcular los conflictos de la siguiente iteración no resuelta contra
   // los datos ya actualizados de esta, para que la visualización en cascada
   // muestre siempre el "Valor anterior" correcto (post-resolución, no el original).

@@ -43,6 +43,7 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  min-width: 0; /* evita que flex/grid items desborden su contenedor */
 }
 
 html {
@@ -54,6 +55,7 @@ body {
   background-color: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -74,10 +76,10 @@ body {
   display: grid;
   grid-template-columns: 400px 1fr;
   grid-template-rows: auto 1fr;
-  gap: 20px;
+  gap: 2px;
   height: 100vh;
-  padding: 20px;
   box-sizing: border-box;
+  background-color: var(--primary-dark);
 }
 
 /* =========================================
@@ -86,11 +88,32 @@ body {
 header {
   grid-column: 1 / -1;
   background-color: var(--primary);
-  padding: 20px 26px;
-  border-bottom: 3px solid var(--primary-dark); /* Remate en turquesa oscuro */
+  padding: 16px 28px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+}
+
+.header-top {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.header-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 header .eyebrow {
@@ -116,13 +139,58 @@ header p {
   color: rgba(255, 255, 255, 0.62);
 }
 
+.header-stats {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.20);
+  padding-left: 28px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-right: 20px;
+}
+
+.stat-value {
+  font-family: var(--font-mono);
+  font-size: 30px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1;
+  letter-spacing: -0.5px;
+}
+
+.stat-value--alert { color: #ffd0d4; }
+.stat-value--ok    { color: #b8f0eb; }
+
+.stat-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.60);
+}
+
+.stat-divider {
+  width: 1px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.22);
+  margin-right: 20px;
+  flex-shrink: 0;
+}
+
 /* --- PANELES --- */
 .panel {
   background: white;
-  border-radius: 3px;
+  border-radius: 0;
   padding: 22px;
   overflow-y: auto;
-  border: 1px solid var(--rule);
+  overflow-x: hidden;
+  border: none;
 }
 
 .panel h2 {
@@ -137,6 +205,183 @@ header p {
   display: flex;
   align-items: baseline;
   gap: 8px;
+}
+
+/* --- FILTROS DE CATEGORÍA (en panel blanco) --- */
+.btn-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--rule);
+  padding: 5px 10px;
+  font-size: 10.5px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: var(--font-sans);
+  border-radius: 2px;
+  cursor: pointer;
+  flex: none;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.btn-filter:hover {
+  border-color: var(--primary);
+  color: var(--primary-dark);
+  filter: none;
+}
+
+.btn-filter.active {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary-dark);
+  font-weight: 600;
+}
+
+.filter-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--rule);
+  color: var(--text-muted);
+  padding: 1px 5px;
+  border-radius: 2px;
+  line-height: 1.4;
+}
+
+.btn-filter.active .filter-count {
+  background: var(--primary);
+  color: white;
+}
+
+.panel-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* --- PANEL DERECHO: watermark "S" siempre visible de fondo --- */
+.panel-right {
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+}
+
+.panel-right-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
+  padding: 22px;
+  box-sizing: border-box;
+}
+
+.panel-right::before {
+  content: 'S';
+  position: absolute;
+  font-family: var(--font-sans);
+  font-weight: 800;
+  font-size: 420px;
+  line-height: 1;
+  color: var(--primary);
+  opacity: 0.055;
+  bottom: -30px;
+  right: -10px;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+}
+
+.panel-right > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* --- PANEL IZQUIERDO: flex-column con scroll acotado --- */
+.panel-left {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Área de contenido scrollable; ocupa todo el espacio disponible
+   dejando el panel-nav siempre al fondo */
+.panel-content {
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.service-list {
+  overflow-y: auto;
+  max-height: calc(4 * 70px);
+}
+
+.panel-nav {
+  flex-shrink: 0;
+  background: white;
+  border-top: 1px solid var(--rule);
+  padding-top: 14px;
+  padding-bottom: 4px;
+  margin-top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.btn-nav {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: var(--font-sans);
+  border-radius: 2px;
+  cursor: pointer;
+  flex: none;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.btn-nav:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.55);
+  color: white;
+  filter: none;
+}
+
+.btn-nav.active {
+  background: rgba(255, 255, 255, 0.28);
+  border-color: white;
+  color: white;
+  font-weight: 600;
+}
+
+.btn-nav-cta {
+  margin-left: auto;
+  background: white;
+  color: var(--primary-dark);
+  border-color: white;
+  font-weight: 600;
+}
+
+.btn-nav-cta:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: white;
+  color: var(--primary-dark);
+  filter: none;
+}
+
+.btn-nav-cta.active {
+  background: white;
+  border-color: white;
+  color: var(--primary-dark);
+  font-weight: 700;
 }
 
 /* --- LISTA DE SERVICIOS --- */
@@ -169,6 +414,9 @@ header p {
   font-size: 13.5px;
   color: var(--ink);
   letter-spacing: 0.2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* --- SELLOS: el elemento de firma del diseño --- */
@@ -200,6 +448,8 @@ header p {
 .stamp-rust { color: var(--rust); background: var(--rust-light); }
 .stamp-amber { color: var(--amber-ink); background: var(--amber-light); }
 .stamp-ink { color: var(--ink); background: var(--paper); }
+.stamp-primary { color: var(--primary-dark); background: var(--primary-light); }
+.stamp-violet { color: #4a2d9c; background: #ede9f9; }
 
 /* --- DETALLE DE SERVICIO --- */
 .iteration-review {
@@ -233,6 +483,8 @@ header p {
   border: 1px solid var(--rule);
   border-radius: 3px;
   padding: 20px;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .data-card.accent-primary { border-top: 2px solid var(--primary); }
@@ -283,6 +535,50 @@ header p {
   margin-top: 2px;
 }
 
+/* --- BLOQUE DE CAMPOS LISTA (Entradas, Salidas, Invoca, Tablas) --- */
+.list-fields-block {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+
+.list-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.list-pills {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 22px;
+}
+
+.data-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.6;
+  letter-spacing: 0.2px;
+}
+
+.pill-empty {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 /* --- DIFF DE CONFLICTO --- */
 .field-diff {
   background: white;
@@ -290,6 +586,8 @@ header p {
   border: 1px solid var(--rule);
   border-radius: 3px;
   margin-bottom: 12px;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .field-name {
@@ -396,7 +694,6 @@ header p {
 }
 
 button {
-  flex: 1;
   padding: 11px 16px;
   border: none;
   border-radius: 2px;
@@ -408,6 +705,8 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.6px;
 }
+
+.buttons button { flex: 1; }
 
 button:hover {
   filter: brightness(0.93);
@@ -609,8 +908,8 @@ button:disabled {
 
 /* Items dentro de un ListEditor: 2 columnas cuando el contenedor lo permite, 1 si no */
 .list-editor-items {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 4px;
   margin-top: 2px;
 }
@@ -676,11 +975,6 @@ button:disabled {
 
 /* Móvil: espaciados reducidos, comparación de conflictos en columna única */
 @media (max-width: 600px) {
-  .container {
-    padding: 12px;
-    gap: 12px;
-  }
-
   .panel {
     padding: 16px;
   }

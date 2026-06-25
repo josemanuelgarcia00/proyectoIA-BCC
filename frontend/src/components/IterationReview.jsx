@@ -203,12 +203,35 @@ function AppCodeInput({ value, onChange, onBlur, className }) {
   );
 }
 
+function ListFieldsBlock({ data }) {
+  const fields = [
+    { label: 'Entradas',             values: data?.inputs },
+    { label: 'Salidas',              values: data?.outputs },
+    { label: 'Invoca',               values: data?.invokes },
+    { label: 'Tablas referenciales', values: data?.reference_tables },
+  ];
+  return (
+    <div className="list-fields-block">
+      {fields.map(({ label, values }) => (
+        <div key={label} className="list-field">
+          <span className="data-field-label">{label}</span>
+          <div className="list-pills">
+            {values && values.length > 0
+              ? values.map((v, i) => <span key={i} className="data-pill">{v}</span>)
+              : <span className="pill-empty">N/D</span>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const STATUS_STAMP = {
   'Aceptado': 'stamp-moss',
   'Unificado': 'stamp-moss',
   'Cerrado': 'stamp-moss',
   'Desechado': 'stamp-rust',
-  'En revision': 'stamp-amber'
+  'En revision': 'stamp-violet'
 };
 
 export default function IterationReview({ service, onServiceClosed }) {
@@ -571,10 +594,7 @@ export default function IterationReview({ service, onServiceClosed }) {
           {localService.dictionary_data?.functional_use || 'N/D'}
         </div>
 
-        <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(localService.dictionary_data?.inputs)}</span></div>
-        <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(localService.dictionary_data?.outputs)}</span></div>
-        <div className="wide"><span className="data-field-label">Invoca</span><span className="mono">{renderList(localService.dictionary_data?.invokes)}</span></div>
-        <div className="wide"><span className="data-field-label">Tablas referenciales</span><span className="mono">{renderList(localService.dictionary_data?.reference_tables)}</span></div>
+        <ListFieldsBlock data={localService.dictionary_data} />
       </div>
     </div>
   );
@@ -599,35 +619,34 @@ export default function IterationReview({ service, onServiceClosed }) {
           {finalData?.functional_use || 'N/D'}
         </div>
 
-        <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(finalData?.inputs)}</span></div>
-        <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(finalData?.outputs)}</span></div>
-        <div className="wide"><span className="data-field-label">Invoca</span><span className="mono">{renderList(finalData?.invokes)}</span></div>
-        <div className="wide"><span className="data-field-label">Tablas referenciales</span><span className="mono">{renderList(finalData?.reference_tables)}</span></div>
+        <ListFieldsBlock data={finalData} />
       </div>
 
-      <div className="buttons" style={{ marginTop: '20px' }}>
-        <button
-          className="btn-accept"
-          disabled={resolvingId === 'accept-close'}
-          onClick={requestAcceptPreview}
-        >
-          {resolvingId === 'accept-close' ? 'Calculando...' : 'Aceptar cambios'}
-        </button>
+      <div className="buttons" style={{ marginTop: '20px', justifyContent: 'space-between' }}>
         <button
           className="btn-quiet"
-          style={{ flex: 1, textAlign: 'center' }}
+          style={{ flex: 'none' }}
           disabled={resolvingId === 'reset'}
           onClick={resetServiceConflicts}
         >
           {resolvingId === 'reset' ? 'Aplicando...' : 'Reiniciar conflicto'}
         </button>
-        <button
-          className="btn-reject"
-          disabled={resolvingId === 'reject-service'}
-          onClick={rejectService}
-        >
-          {resolvingId === 'reject-service' ? 'Aplicando...' : 'Rechazar servicio'}
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            className="btn-reject"
+            disabled={resolvingId === 'reject-service'}
+            onClick={rejectService}
+          >
+            {resolvingId === 'reject-service' ? 'Aplicando...' : 'Rechazar servicio'}
+          </button>
+          <button
+            className="btn-accept"
+            disabled={resolvingId === 'accept-close'}
+            onClick={requestAcceptPreview}
+          >
+            {resolvingId === 'accept-close' ? 'Calculando...' : 'Aceptar cambios'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -714,7 +733,7 @@ export default function IterationReview({ service, onServiceClosed }) {
               </span>
             )}
           </div>
-          <div className="wide" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+          <div className="wide" style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingTop: '14px', borderTop: '1px solid var(--rule)' }}>
             <ListEditor label="Entradas" items={localEdits.inputs || []} onChange={(v) => setLocalEdits((p) => ({ ...p, inputs: v }))} error={validationErrors.inputs} onBlur={() => setValidationErrors((prev) => ({ ...prev, inputs: null }))} />
             <ListEditor label="Salidas" items={localEdits.outputs || []} onChange={(v) => setLocalEdits((p) => ({ ...p, outputs: v }))} error={validationErrors.outputs} onBlur={() => setValidationErrors((prev) => ({ ...prev, outputs: null }))} />
             <ListEditor label="Invoca" items={localEdits.invokes || []} onChange={(v) => setLocalEdits((p) => ({ ...p, invokes: v }))} error={validationErrors.invokes} onBlur={() => setValidationErrors((prev) => ({ ...prev, invokes: null }))} />
@@ -725,26 +744,26 @@ export default function IterationReview({ service, onServiceClosed }) {
         <div className="buttons" style={{ marginTop: '20px', justifyContent: 'space-between' }}>
           <button
             className="btn-quiet"
+            style={{ flex: 'none' }}
             disabled={savingEdits}
             onClick={() => saveIterationEdits(lastIteration.iteration_id)}
-            style={{ fontSize: '12px', padding: '4px 12px' }}
           >
             {savingEdits ? 'Guardando...' : 'Guardar estado'}
           </button>
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button
-              className="btn-accept"
-              disabled={resolvingId === 'accept-close'}
-              onClick={requestAcceptPreview}
-            >
-              {resolvingId === 'accept-close' ? 'Calculando...' : 'Aceptar'}
-            </button>
             <button
               className="btn-reject"
               disabled={resolvingId === 'reject-service'}
               onClick={rejectService}
             >
               {resolvingId === 'reject-service' ? 'Aplicando...' : 'Rechazar'}
+            </button>
+            <button
+              className="btn-accept"
+              disabled={resolvingId === 'accept-close'}
+              onClick={requestAcceptPreview}
+            >
+              {resolvingId === 'accept-close' ? 'Calculando...' : 'Aceptar'}
             </button>
           </div>
         </div>
@@ -766,10 +785,7 @@ export default function IterationReview({ service, onServiceClosed }) {
           <span className="data-field-label">Uso funcional</span>
           {previousIteration.data?.functional_use || 'N/D'}
         </div>
-        <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(previousIteration.data?.inputs)}</span></div>
-        <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(previousIteration.data?.outputs)}</span></div>
-        <div className="wide"><span className="data-field-label">Invoca</span><span className="mono">{renderList(previousIteration.data?.invokes)}</span></div>
-        <div className="wide"><span className="data-field-label">Tablas referenciales</span><span className="mono">{renderList(previousIteration.data?.reference_tables)}</span></div>
+        <ListFieldsBlock data={previousIteration.data} />
       </div>
     </div>
   ) : null;
@@ -838,10 +854,7 @@ export default function IterationReview({ service, onServiceClosed }) {
                   <span className="data-field-label">Uso funcional</span>
                   {currentIteration.data.functional_use || 'N/D'}
                 </div>
-                <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(currentIteration.data.inputs)}</span></div>
-                <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(currentIteration.data.outputs)}</span></div>
-                <div className="wide"><span className="data-field-label">Invoca</span><span className="mono">{renderList(currentIteration.data.invokes)}</span></div>
-                <div className="wide"><span className="data-field-label">Tablas referenciales</span><span className="mono">{renderList(currentIteration.data.reference_tables)}</span></div>
+                <ListFieldsBlock data={currentIteration.data} />
               </div>
             </div>
 
@@ -875,23 +888,85 @@ export default function IterationReview({ service, onServiceClosed }) {
                         <div className="field-name">
                           <span className="mono">{FIELD_LABELS[conflict.column] ?? conflict.column}</span>
                         </div>
-                        <div className="field-values">
-                          <div className="value-box">
-                            <div className="label">Valor anterior</div>
-                            <div style={{ color: 'var(--text-muted)' }}>
-                              {conflict.original || 'N/D'}
+
+                        {conflict.original ? (
+                          /* Diff real: hay valor anterior → layout dos columnas */
+                          <div className="field-values">
+                            <div className="value-box">
+                              <div className="label">Valor anterior</div>
+                              {isList ? (
+                                <div className="list-pills" style={{ marginTop: '4px' }}>
+                                  {conflict.original.split(', ').filter(Boolean).map((v, i) => (
+                                    <span key={i} className="data-pill" style={{ opacity: 0.7 }}>{v.trim()}</span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div style={{ color: 'var(--text-muted)' }}>{conflict.original}</div>
+                              )}
+                            </div>
+                            <div className="value-box">
+                              {isEditable && isList ? (
+                                <ListEditor
+                                  label="Nueva propuesta"
+                                  items={localEdits[conflict.column] || []}
+                                  onChange={(v) => setLocalEdits((p) => ({ ...p, [conflict.column]: v }))}
+                                  error={validationErrors[conflict.column]}
+                                  onBlur={() => setValidationErrors((prev) => ({ ...prev, [conflict.column]: null }))}
+                                />
+                              ) : <div className="label">Nueva propuesta</div>}
+                              {isEditable && !isList && (() => {
+                                const col = conflict.column;
+                                const enumOpts = FIELD_ENUM_OPTIONS[col];
+                                const hasErr = !!validationErrors[col];
+                                const cls = hasErr ? 'input-error' : '';
+                                const setVal = (v) => setLocalEdits((p) => ({ ...p, [col]: v }));
+                                const onBlurConflict = () => {
+                                  const val = (localEdits[col] || '').trim();
+                                  if (!val) {
+                                    setValidationErrors((prev) => ({ ...prev, [col]: 'El campo no puede estar vacío' }));
+                                  } else if (col === 'app' && !/^[A-Z]{3}$/.test(val)) {
+                                    setValidationErrors((prev) => ({ ...prev, [col]: 'El código de app debe tener exactamente 3 letras' }));
+                                  } else {
+                                    setValidationErrors((prev) => ({ ...prev, [col]: null }));
+                                  }
+                                };
+                                let control;
+                                if (col === 'app') {
+                                  control = <AppCodeInput value={localEdits[col] ?? ''} onChange={setVal} onBlur={onBlurConflict} className={cls} />;
+                                } else if (enumOpts) {
+                                  control = <FixedSelect value={localEdits[col] ?? ''} onChange={setVal} onBlur={onBlurConflict} options={enumOpts} className={cls} />;
+                                } else {
+                                  control = <input type="text" value={localEdits[col] ?? ''} onChange={(e) => setVal(e.target.value)} onBlur={onBlurConflict} className={cls} style={FIELD_INPUT_STYLE} />;
+                                }
+                                return (
+                                  <>
+                                    {control}
+                                    {hasErr && <span className="field-error-msg">{validationErrors[col]}</span>}
+                                  </>
+                                );
+                              })()}
+                              {!isEditable && (
+                                <div style={{ color: 'var(--ink)', fontWeight: 600 }}>
+                                  {conflict.proposed}
+                                </div>
+                              )}
                             </div>
                           </div>
-                          <div className="value-box">
+                        ) : (
+                          /* Sin valor previo → columna única, sin comparación */
+                          <div style={{ paddingTop: '6px' }}>
+                            <div className="label" style={{ marginBottom: '8px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                              Campo nuevo — sin valor previo en el diccionario
+                            </div>
                             {isEditable && isList ? (
                               <ListEditor
-                                label="Nueva propuesta"
+                                label="Valor propuesto"
                                 items={localEdits[conflict.column] || []}
                                 onChange={(v) => setLocalEdits((p) => ({ ...p, [conflict.column]: v }))}
                                 error={validationErrors[conflict.column]}
                                 onBlur={() => setValidationErrors((prev) => ({ ...prev, [conflict.column]: null }))}
                               />
-                            ) : <div className="label">Nueva propuesta</div>}
+                            ) : null}
                             {isEditable && !isList && (() => {
                               const col = conflict.column;
                               const enumOpts = FIELD_ENUM_OPTIONS[col];
@@ -925,11 +1000,11 @@ export default function IterationReview({ service, onServiceClosed }) {
                             })()}
                             {!isEditable && (
                               <div style={{ color: 'var(--ink)', fontWeight: 600 }}>
-                                {conflict.proposed || 'N/D'}
+                                {conflict.proposed}
                               </div>
                             )}
                           </div>
-                        </div>
+                        )}
                       </div>
                     );
                   });
@@ -940,24 +1015,24 @@ export default function IterationReview({ service, onServiceClosed }) {
                     className="btn-quiet"
                     disabled={savingEdits}
                     onClick={() => saveIterationEdits(currentIteration.iteration_id)}
-                    style={{ fontSize: '12px', padding: '4px 12px' }}
+                    style={{ flex: 'none' }}
                   >
                     {savingEdits ? 'Guardando...' : 'Guardar estado'}
                   </button>
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    <button
-                      className="btn-unify"
-                      disabled={resolvingId === currentIteration.iteration_id}
-                      onClick={() => resolveIteration(currentIteration.iteration_id, 'unify')}
-                    >
-                      {resolvingId === currentIteration.iteration_id ? 'Aplicando...' : 'Unificar'}
-                    </button>
                     <button
                       className="btn-reject"
                       disabled={resolvingId === currentIteration.iteration_id}
                       onClick={() => rejectIterationWithConfirm(currentIteration.iteration_id)}
                     >
                       {resolvingId === currentIteration.iteration_id ? 'Aplicando...' : 'Rechazar cambios'}
+                    </button>
+                    <button
+                      className="btn-unify"
+                      disabled={resolvingId === currentIteration.iteration_id}
+                      onClick={() => resolveIteration(currentIteration.iteration_id, 'unify')}
+                    >
+                      {resolvingId === currentIteration.iteration_id ? 'Aplicando...' : 'Unificar'}
                     </button>
                   </div>
                 </div>
@@ -1032,27 +1107,24 @@ export default function IterationReview({ service, onServiceClosed }) {
                 {previewData.functional_use || 'N/D'}
               </div>
 
-              <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(previewData.inputs)}</span></div>
-              <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(previewData.outputs)}</span></div>
-              <div className="wide"><span className="data-field-label">Invoca</span><span className="mono">{renderList(previewData.invokes)}</span></div>
-              <div className="wide"><span className="data-field-label">Tablas referenciales</span><span className="mono">{renderList(previewData.reference_tables)}</span></div>
+              <ListFieldsBlock data={previewData} />
             </div>
 
             <div className="buttons" style={{ marginTop: '24px' }}>
+              <button
+                className="btn-quiet"
+                style={{ flex: 'none' }}
+                disabled={resolvingId === 'accept-close'}
+                onClick={() => setPreviewData(null)}
+              >
+                Cancelar
+              </button>
               <button
                 className="btn-accept"
                 disabled={resolvingId === 'accept-close'}
                 onClick={confirmAcceptAndClose}
               >
                 {resolvingId === 'accept-close' ? 'Aplicando...' : 'Confirmar y cerrar'}
-              </button>
-              <button
-                className="btn-quiet"
-                style={{ flex: 1, textAlign: 'center' }}
-                disabled={resolvingId === 'accept-close'}
-                onClick={() => setPreviewData(null)}
-              >
-                Cancelar
               </button>
             </div>
           </div>
@@ -1100,15 +1172,15 @@ export default function IterationReview({ service, onServiceClosed }) {
             )}
 
             <div className="buttons">
-              <button className="btn-reject" onClick={() => confirmDialog.onConfirm(rejectObservations)}>
-                {confirmDialog.confirmLabel || 'Confirmar'}
-              </button>
               <button
                 className="btn-quiet"
-                style={{ flex: 1, textAlign: 'center' }}
+                style={{ flex: 'none' }}
                 onClick={() => setConfirmDialog(null)}
               >
                 Cancelar
+              </button>
+              <button className="btn-reject" onClick={() => confirmDialog.onConfirm(rejectObservations)}>
+                {confirmDialog.confirmLabel || 'Confirmar'}
               </button>
             </div>
           </div>
