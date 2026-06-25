@@ -20,14 +20,16 @@ function ListEditor({ items, onChange, label, error, onBlur }) {
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', position: 'relative' }}>
-      <button
-        type="button"
-        onClick={() => onChange([...list, ''])}
-        title="Añadir"
-        style={{ position: 'absolute', top: 0, right: 0, width: '18px', height: '18px', cursor: 'pointer', border: '1px solid #2e7d32', borderRadius: '2px', background: '#2e7d32', color: 'white', fontWeight: 700, fontSize: '13px', lineHeight: 1, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      >+</button>
-      <span className="data-field-label" style={{ margin: 0, marginBottom: '4px', paddingRight: '22px' }}>{label || ''}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+        <button
+          type="button"
+          onClick={() => onChange([...list, ''])}
+          title="Añadir"
+          style={{ flexShrink: 0, width: '18px', height: '18px', cursor: 'pointer', border: '1px solid var(--primary-dark)', borderRadius: '2px', background: 'var(--primary)', color: 'white', fontWeight: 700, fontSize: '13px', lineHeight: 1, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >+</button>
+        <span className="data-field-label" style={{ margin: 0 }}>{label || ''}</span>
+      </div>
       {list.length === 0 && (
         <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic' }}>N/D</span>
       )}
@@ -52,7 +54,7 @@ function ListEditor({ items, onChange, label, error, onBlur }) {
                 type="button"
                 onClick={() => onChange(list.filter((_, i) => i !== idx))}
                 title="Eliminar"
-                style={{ flex: 'none', padding: '4px 8px', fontSize: '11px', lineHeight: 1, cursor: 'pointer', border: '1px solid var(--rule)', borderRadius: '2px', background: 'white', color: 'var(--rust, #c0392b)', fontWeight: 600 }}
+                style={{ flex: 'none', padding: '4px 10px', fontSize: '12px', lineHeight: 1.4, cursor: 'pointer', border: '1px solid var(--rule)', borderRadius: '2px', background: 'white', color: 'var(--rust)', fontWeight: 600, textTransform: 'none', letterSpacing: 0 }}
               >Eliminar</button>
             </div>
           );
@@ -621,33 +623,6 @@ export default function IterationReview({ service, onServiceClosed }) {
 
         <ListFieldsBlock data={finalData} />
       </div>
-
-      <div className="buttons" style={{ marginTop: '20px', justifyContent: 'space-between' }}>
-        <button
-          className="btn-quiet"
-          style={{ flex: 'none' }}
-          disabled={resolvingId === 'reset'}
-          onClick={resetServiceConflicts}
-        >
-          {resolvingId === 'reset' ? 'Aplicando...' : 'Reiniciar conflicto'}
-        </button>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button
-            className="btn-reject"
-            disabled={resolvingId === 'reject-service'}
-            onClick={rejectService}
-          >
-            {resolvingId === 'reject-service' ? 'Aplicando...' : 'Rechazar servicio'}
-          </button>
-          <button
-            className="btn-accept"
-            disabled={resolvingId === 'accept-close'}
-            onClick={requestAcceptPreview}
-          >
-            {resolvingId === 'accept-close' ? 'Calculando...' : 'Aceptar cambios'}
-          </button>
-        </div>
-      </div>
     </div>
   );
 
@@ -660,11 +635,7 @@ export default function IterationReview({ service, onServiceClosed }) {
       const cls = hasError ? 'input-error' : isWarning ? 'input-warning' : '';
       const onBlur = () => {
         const val = (localEdits[field] || '').trim();
-        if (!val) {
-          setValidationErrors((prev) => ({ ...prev, [field]: `El campo no puede estar vacío` }));
-        } else if (field === 'app' && !/^[A-Z]{3}$/.test(val)) {
-          setValidationErrors((prev) => ({ ...prev, [field]: 'El código de app debe tener exactamente 3 letras' }));
-        } else {
+        if (val && !(field === 'app' && !/^[A-Z]{3}$/.test(val))) {
           setValidationErrors((prev) => ({ ...prev, [field]: null }));
         }
       };
@@ -712,9 +683,7 @@ export default function IterationReview({ service, onServiceClosed }) {
               value={localEdits.functional_use ?? ''}
               onChange={(e) => setLocalEdits((p) => ({ ...p, functional_use: e.target.value }))}
               onBlur={() => {
-                if (!localEdits.functional_use || !localEdits.functional_use.trim()) {
-                  setValidationErrors((prev) => ({ ...prev, functional_use: '__warning__El campo "Uso funcional" está vacío' }));
-                } else {
+                if (localEdits.functional_use && localEdits.functional_use.trim()) {
                   setValidationErrors((prev) => ({ ...prev, functional_use: null }));
                 }
               }}
@@ -818,10 +787,37 @@ export default function IterationReview({ service, onServiceClosed }) {
           newServiceResultBox
         ) : (
           /* Diccionario y resultado final lado a lado, una vez revisados todos los conflictos */
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-            {dictionaryBox}
-            {finalResultBox}
-          </div>
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+              {dictionaryBox}
+              {finalResultBox}
+            </div>
+            <div className="buttons" style={{ marginTop: '16px', justifyContent: 'space-between' }}>
+              <button
+                className="btn-quiet"
+                disabled={resolvingId === 'reset'}
+                onClick={resetServiceConflicts}
+              >
+                {resolvingId === 'reset' ? 'Aplicando...' : 'Reiniciar conflicto'}
+              </button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  className="btn-reject"
+                  disabled={resolvingId === 'reject-service'}
+                  onClick={rejectService}
+                >
+                  {resolvingId === 'reject-service' ? 'Aplicando...' : 'Rechazar servicio'}
+                </button>
+                <button
+                  className="btn-accept"
+                  disabled={resolvingId === 'accept-close'}
+                  onClick={requestAcceptPreview}
+                >
+                  {resolvingId === 'accept-close' ? 'Calculando...' : 'Aceptar cambios'}
+                </button>
+              </div>
+            </div>
+          </>
         )
       ) : (
         <>
@@ -922,11 +918,7 @@ export default function IterationReview({ service, onServiceClosed }) {
                                 const setVal = (v) => setLocalEdits((p) => ({ ...p, [col]: v }));
                                 const onBlurConflict = () => {
                                   const val = (localEdits[col] || '').trim();
-                                  if (!val) {
-                                    setValidationErrors((prev) => ({ ...prev, [col]: 'El campo no puede estar vacío' }));
-                                  } else if (col === 'app' && !/^[A-Z]{3}$/.test(val)) {
-                                    setValidationErrors((prev) => ({ ...prev, [col]: 'El código de app debe tener exactamente 3 letras' }));
-                                  } else {
+                                  if (val && !(col === 'app' && !/^[A-Z]{3}$/.test(val))) {
                                     setValidationErrors((prev) => ({ ...prev, [col]: null }));
                                   }
                                 };
@@ -1025,7 +1017,7 @@ export default function IterationReview({ service, onServiceClosed }) {
                       disabled={resolvingId === currentIteration.iteration_id}
                       onClick={() => rejectIterationWithConfirm(currentIteration.iteration_id)}
                     >
-                      {resolvingId === currentIteration.iteration_id ? 'Aplicando...' : 'Rechazar cambios'}
+                      {resolvingId === currentIteration.iteration_id ? 'Aplicando...' : 'Rechazar'}
                     </button>
                     <button
                       className="btn-unify"

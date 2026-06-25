@@ -8,15 +8,17 @@ const STATUS_STAMP = {
   'En revision': 'stamp-amber'
 };
 
+const LIST_FIELDS = [
+  { key: 'inputs',           label: 'Entradas' },
+  { key: 'outputs',          label: 'Salidas' },
+  { key: 'invokes',          label: 'Invoca' },
+  { key: 'reference_tables', label: 'Tablas referenciales' },
+];
+
 export default function DictionaryEntry({ service }) {
   if (!service) {
     return <div className="empty">Selecciona un servicio para ver sus datos.</div>;
   }
-
-  const renderList = (list) => {
-    if (!list || list.length === 0) return 'N/D';
-    return list.join(', ');
-  };
 
   const data = service.dictionary_data;
   const stampClass = STATUS_STAMP[service.status] || 'stamp-ink';
@@ -60,10 +62,18 @@ export default function DictionaryEntry({ service }) {
               {data.functional_use || 'N/D'}
             </div>
 
-            <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(data.inputs)}</span></div>
-            <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(data.outputs)}</span></div>
-            <div className="wide"><span className="data-field-label">Invoca</span><span className="mono">{renderList(data.invokes)}</span></div>
-            <div className="wide"><span className="data-field-label">Tablas referenciales</span><span className="mono">{renderList(data.reference_tables)}</span></div>
+            <div className="list-fields-block">
+              {LIST_FIELDS.map(({ key, label }) => (
+                <div key={key} className="list-field">
+                  <span className="data-field-label">{label}</span>
+                  <div className="list-pills">
+                    {data[key]?.length > 0
+                      ? data[key].map((v, i) => <span key={i} className="data-pill">{v}</span>)
+                      : <span className="pill-empty">N/D</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

@@ -215,11 +215,11 @@ header p {
   background: transparent;
   color: var(--text-muted);
   border: 1px solid var(--rule);
-  padding: 5px 10px;
-  font-size: 10.5px;
+  padding: 6px 12px;
+  font-size: 12px;
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   font-family: var(--font-sans);
   border-radius: 2px;
   cursor: pointer;
@@ -242,11 +242,11 @@ header p {
 
 .filter-count {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   background: var(--rule);
   color: var(--text-muted);
-  padding: 1px 5px;
+  padding: 1px 6px;
   border-radius: 2px;
   line-height: 1.4;
 }
@@ -311,11 +311,14 @@ header p {
   flex: 1;
   overflow: hidden;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .service-list {
   overflow-y: auto;
-  max-height: calc(4 * 70px);
+  flex: 1;
+  min-height: 0;
 }
 
 .panel-nav {
@@ -336,11 +339,11 @@ header p {
   background: rgba(255, 255, 255, 0.12);
   color: rgba(255, 255, 255, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.28);
-  padding: 6px 14px;
-  font-size: 11px;
+  padding: 7px 15px;
+  font-size: 12px;
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   font-family: var(--font-sans);
   border-radius: 2px;
   cursor: pointer;
@@ -400,6 +403,14 @@ header p {
 .service-item:hover {
   background-color: var(--primary-light);
   border-left-color: var(--rule-strong);
+}
+
+.service-item.has-conflict {
+  border-left-color: var(--rust);
+}
+
+.service-item.is-resolved {
+  border-left-color: var(--moss);
 }
 
 .service-item.active {
@@ -694,16 +705,18 @@ header p {
 }
 
 button {
-  padding: 11px 16px;
+  padding: 11px 18px;
   border: none;
   border-radius: 2px;
   cursor: pointer;
   font-weight: 600;
   font-family: var(--font-sans);
   transition: filter 0.12s ease;
-  font-size: 12.5px;
+  font-size: 13px;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  hyphens: none;
 }
 
 .buttons button { flex: 1; }
@@ -726,8 +739,8 @@ button:disabled {
   background: transparent;
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.35);
-  padding: 9px 14px;
-  font-size: 11.5px;
+  padding: 9px 15px;
+  font-size: 12.5px;
   flex: none;
   border-radius: 2px;
 }
@@ -760,8 +773,8 @@ button:disabled {
   text-transform: none;
   letter-spacing: 0;
   font-weight: 500;
-  font-size: 12.5px;
-  padding: 7px 12px;
+  font-size: 13px;
+  padding: 8px 14px;
 }
 
 .btn-quiet:hover {

@@ -101,29 +101,24 @@ function CatalogView() {
           </div>
           {!loading && stats.total > 0 && (
             <div className="header-stats">
-              <div className="stat-item">
-                <span className="stat-value">{stats.total}</span>
-                <span className="stat-label">total</span>
-              </div>
               {view === 'conflicts' && (
                 <>
-                  <div className="stat-divider" />
                   <div className="stat-item">
                     <span className="stat-value stat-value--alert">{stats.conConflicto}</span>
                     <span className="stat-label">con conflictos</span>
                   </div>
                   <div className="stat-divider" />
                   <div className="stat-item">
-                    <span className="stat-value stat-value--ok">{stats.resueltos}</span>
-                    <span className="stat-label">resueltos</span>
-                  </div>
-                  <div className="stat-divider" />
-                  <div className="stat-item">
                     <span className="stat-value">{stats.sinConflicto}</span>
                     <span className="stat-label">sin conflictos</span>
                   </div>
+                  <div className="stat-divider" />
                 </>
               )}
+              <div className="stat-item">
+                <span className="stat-value">{stats.total}</span>
+                <span className="stat-label">total</span>
+              </div>
             </div>
           )}
         </div>
@@ -211,25 +206,38 @@ function CatalogView() {
                         No se encontraron servicios que coincidan con "<strong>{searchTerm}</strong>"
                       </div>
                     ) : (
-                      displayedServices.map((service) => (
-                        <div
-                          key={service.service_name}
-                          className={`service-item ${selectedService?.service_name === service.service_name ? 'active' : ''}`}
-                          onClick={() => setSelectedService(service)}
-                        >
-                          <div className="service-name">{service.service_name}</div>
-                          <div style={{ fontSize: '12px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            {service.is_in_dictionary
-                              ? <span className="stamp stamp-moss">En diccionario</span>
-                              : <span className="stamp stamp-amber">Nuevo</span>}
-                            {view !== 'dictionary' && service.perimeter_iterations?.length > 0 && (
-                              <span className="mono" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                {service.perimeter_iterations.length} iteraciones
-                              </span>
-                            )}
+                      displayedServices.map((service) => {
+                        const isActive = selectedService?.service_name === service.service_name;
+                        const stateClass = view === 'conflicts'
+                          ? service.requires_attention ? ' has-conflict' : service.closed ? ' is-resolved' : ''
+                          : '';
+                        const iterCount = service.perimeter_iterations?.length ?? 0;
+                        return (
+                          <div
+                            key={service.service_name}
+                            className={`service-item${isActive ? ' active' : ''}${stateClass}`}
+                            onClick={() => setSelectedService(service)}
+                          >
+                            <div className="service-name">{service.service_name}</div>
+                            <div style={{ fontSize: '12px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                              {service.is_in_dictionary
+                                ? <span className="stamp stamp-moss">En diccionario</span>
+                                : <span className="stamp stamp-amber">Nuevo</span>}
+                              {view === 'conflicts' && service.requires_attention && (
+                                <span className="stamp stamp-rust">Conflictos</span>
+                              )}
+                              {view === 'conflicts' && service.closed && !service.requires_attention && (
+                                <span className="stamp stamp-moss">Resuelto</span>
+                              )}
+                              {view !== 'dictionary' && iterCount > 0 && (
+                                <span className="mono" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                  {iterCount} {iterCount === 1 ? 'iteración' : 'iteraciones'}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </>
@@ -244,7 +252,6 @@ function CatalogView() {
                     { key: 'new',      label: 'Nuevos',         count: filteredServices.filter(s => !s.is_in_dictionary).length },
                     { key: 'conflict', label: 'Con conflictos', count: filteredServices.filter(s => s.requires_attention).length },
                     { key: 'clean',    label: 'Sin conflictos', count: filteredServices.filter(s => !s.requires_attention && !s.closed).length },
-                    { key: 'resolved', label: 'Resueltos',      count: filteredServices.filter(s => s.closed).length },
                   ].map(({ key, label, count }) => (
                     <button
                       key={key}
