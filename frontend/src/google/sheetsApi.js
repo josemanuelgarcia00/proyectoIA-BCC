@@ -79,6 +79,19 @@ export async function clearAndWrite(_sheetId, sheetName, values) {
   await callAppsScriptPost({ action: 'clearAndWrite', sheet: sheetName, values });
 }
 
+/** Añade filas al final de la hoja sin borrar el contenido existente. */
+export async function appendRows(sheetName, values) {
+  await callAppsScriptPost({ action: 'appendRows', sheet: sheetName, values });
+}
+
+/**
+ * Descarga un archivo de Google Drive a través del Apps Script (que tiene acceso a Drive).
+ * Devuelve { name, mimeType, base64 }.
+ */
+export async function getDriveFile(fileId) {
+  return callAppsScriptPost({ action: 'getDriveFile', fileId });
+}
+
 /** Igual que gspread worksheet.get_all_records(): primera fila = cabecera. */
 export function recordsFromValues(values) {
   if (!values || values.length === 0) return [];

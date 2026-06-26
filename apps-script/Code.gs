@@ -86,10 +86,71 @@ function doPost(e) {
       return clearAndWrite(payload.sheet, payload.values);
     }
 
+    if (action === 'appendRows') {
+      return appendRows(payload.sheet, payload.values);
+    }
+
+    if (action === 'getDriveFile') {
+      return getDriveFile(payload.fileId);
+    }
+
     return jsonOutput({ error: 'Acción POST no soportada: ' + action });
   } catch (err) {
     return jsonOutput({ error: String(err && err.message ? err.message : err) });
   }
+}
+
+/**
+ * Descarga un archivo de Google Drive por su ID y lo devuelve como base64.
+ * El Apps Script debe tener acceso al archivo (compartido con el propietario del script).
+ */
+function getDriveFile(fileId) {
+  if (!fileId) {
+    return jsonOutput({ error: 'Falta fileId' });
+  }
+  try {
+    var file = DriveApp.getFileById(fileId);
+    var blob = file.getBlob();
+    var base64 = Utilities.base64Encode(blob.getBytes());
+    return jsonOutput({
+      ok: true,
+      name: file.getName(),
+      mimeType: blob.getContentType(),
+      base64: base64,
+    });
+  } catch (err) {
+    return jsonOutput({ error: 'No se puede acceder al archivo en Drive: ' + String(err.message || err) });
+  }
+}
+
+/** Añade filas al final de la hoja sin borrar el contenido existente (headers incluidos). */
+function appendRows(sheetName, values) {
+  if (!sheetName) {
+    return jsonOutput({ error: 'Falta el nombre de la hoja' });
+  }
+
+  var ss = getSpreadsheet();
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    return jsonOutput({ error: 'La hoja "' + sheetName + '" no existe' });
+  }
+
+  var rows = values || [];
+  if (rows.length === 0) {
+    return jsonOutput({ ok: true, added: 0 });
+  }
+
+  var maxCols = rows.reduce(function (m, row) { return Math.max(m, row.length); }, 0);
+  var normalized = rows.map(function (row) {
+    var copy = row.slice();
+    while (copy.length < maxCols) copy.push('');
+    return copy;
+  });
+
+  var lastRow = sheet.getLastRow();
+  sheet.getRange(lastRow + 1, 1, normalized.length, maxCols).setValues(normalized);
+
+  return jsonOutput({ ok: true, added: rows.length });
 }
 
 /** Crea la hoja si no existe, la limpia por completo y escribe la tabla 2D. */

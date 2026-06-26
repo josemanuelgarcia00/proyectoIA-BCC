@@ -4,6 +4,7 @@ import DictionaryEntry from './components/DictionaryEntry';
 import RejectedEntry from './components/RejectedEntry';
 import SaveSelector from './components/SaveSelector';
 import SplashScreen from './components/SplashScreen';
+import ImportFromAF from './components/ImportFromAF';
 import { CatalogProvider, useCatalog } from './contexts/CatalogContext';
 import './index.css';
 
@@ -48,10 +49,10 @@ function CatalogView() {
     removeService,
   } = useCatalog();
 
+  const [showImport, setShowImport] = useState(false);
+
   useEffect(() => { loadConflicts(); }, []);
 
-  // Filtra por nombre de servicio según el término de búsqueda, y opcionalmente
-  // ordena alfabéticamente (solo disponible en el Diccionario completo)
   const [conflictFilter, setConflictFilter] = useState('all');
 
   useEffect(() => { setConflictFilter('all'); }, [view]);
@@ -123,14 +124,17 @@ function CatalogView() {
           )}
         </div>
         <div className="header-nav">
-          <button className={`btn-nav${view === 'conflicts' ? ' active' : ''}`} onClick={loadConflicts}>Revisar servicios</button>
-          <button className={`btn-nav${view === 'dictionary' ? ' active' : ''}`} onClick={loadDictionary}>Ver diccionario completo</button>
-          <button className={`btn-nav${view === 'rejected' ? ' active' : ''}`} onClick={loadRejected}>Ver desechados</button>
-          <button className={`btn-nav btn-nav-cta${view === 'save' ? ' active' : ''}`} onClick={loadSaveSelection}>Guardar servicios</button>
+          <button className={`btn-nav${!showImport && view === 'conflicts' ? ' active' : ''}`} onClick={() => { setShowImport(false); loadConflicts(); }}>Revisar servicios</button>
+          <button className={`btn-nav${!showImport && view === 'dictionary' ? ' active' : ''}`} onClick={() => { setShowImport(false); loadDictionary(); }}>Ver diccionario completo</button>
+          <button className={`btn-nav${!showImport && view === 'rejected' ? ' active' : ''}`} onClick={() => { setShowImport(false); loadRejected(); }}>Ver desechados</button>
+          <button className={`btn-nav${showImport ? ' active' : ''}`} onClick={() => setShowImport(true)}>Importar AF</button>
+          <button className={`btn-nav btn-nav-cta${!showImport && view === 'save' ? ' active' : ''}`} onClick={() => { setShowImport(false); loadSaveSelection(); }}>Guardar servicios</button>
         </div>
       </header>
 
-      {view === 'save' ? (
+      {showImport ? (
+        <ImportFromAF onDone={() => { setShowImport(false); loadConflicts(); }} />
+      ) : view === 'save' ? (
         <>
           <div className="panel panel-left">
             <div className="panel-content">
