@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import * as servicesApi from '../api/servicesApi';
 import { APP_CODES, FIELD_ENUM_OPTIONS } from '../domain/enums';
 
-function ListEditor({ items, onChange, label, error, onBlur }) {
+function ListEditor({ items, onChange, label, error, onBlur, submitted }) {
   const list = Array.isArray(items) ? items : [];
+  const [touched, setTouched] = useState(new Set());
 
   const emptyIndices = new Set(
     list.map((item, i) => (!item || !item.trim() ? i : -1)).filter((i) => i >= 0)
@@ -29,13 +30,14 @@ function ListEditor({ items, onChange, label, error, onBlur }) {
       )}
       <div className="list-editor-items">
         {list.map((item, idx) => {
-          const hasItemError = emptyIndices.has(idx) || dupeIndices.has(idx);
+          const hasItemError = (emptyIndices.has(idx) || dupeIndices.has(idx)) && (touched.has(idx) || submitted);
           return (
             <div key={idx} style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
               <input
                 type="text"
                 value={item}
                 onChange={(e) => {
+                  setTouched(prev => new Set([...prev, idx]));
                   const next = [...list];
                   next[idx] = e.target.value;
                   onChange(next);
@@ -46,7 +48,17 @@ function ListEditor({ items, onChange, label, error, onBlur }) {
               />
               <button
                 type="button"
-                onClick={() => onChange(list.filter((_, i) => i !== idx))}
+                onClick={() => {
+                  setTouched(prev => {
+                    const next = new Set();
+                    for (const i of prev) {
+                      if (i < idx) next.add(i);
+                      else if (i > idx) next.add(i - 1);
+                    }
+                    return next;
+                  });
+                  onChange(list.filter((_, i) => i !== idx));
+                }}
                 title="Eliminar"
                 style={{ flex: 'none', padding: '4px 10px', fontSize: '12px', lineHeight: 1.4, cursor: 'pointer', border: '1px solid var(--rule)', borderRadius: '2px', background: 'white', color: 'var(--rust)', fontWeight: 600, textTransform: 'none', letterSpacing: 0 }}
               >Eliminar</button>
@@ -287,6 +299,7 @@ function CompareTable({ iterationData, dictionaryData, conflicts, localEdits, se
           onChange={v => setVal(v)}
           error={validationErrors[key]}
           onBlur={() => setValidationErrors(p => ({ ...p, [key]: null }))}
+          submitted={saveAttempted}
         />
       );
     }
@@ -387,6 +400,7 @@ export default function IterationReview({ service, onServiceClosed }) {
   const [localEdits, setLocalEdits] = useState({});
   const [savingEdits, setSavingEdits] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
+  const [saveAttempted, setSaveAttempted] = useState(false);
 
   const dataToEdits = (data) => ({
     app: data.app || '',
@@ -406,6 +420,7 @@ export default function IterationReview({ service, onServiceClosed }) {
     setToast(null);
     setPreviewData(null);
     setValidationErrors({});
+    setSaveAttempted(false);
 
     // Inicializar localEdits desde el prop directamente: evita el bug de stale
     // dependency cuando dos servicios distintos comparten el mismo currentIterationId
@@ -435,6 +450,7 @@ export default function IterationReview({ service, onServiceClosed }) {
   // Inicializar edits cuando la iteración activa cambia
   useEffect(() => {
     setValidationErrors({});
+    setSaveAttempted(false);
     const it = visibleIterationsEarly[0];
     if (it) {
       setLocalEdits(dataToEdits(it.data));
@@ -616,6 +632,7 @@ export default function IterationReview({ service, onServiceClosed }) {
     setValidationErrors(errors);
     const blockingErrors = Object.values(errors).filter((e) => e && !e.startsWith('__warning__'));
     if (blockingErrors.length > 0) {
+      setSaveAttempted(true);
       showToast('❌ Corrige los errores antes de guardar');
       return;
     }
@@ -636,6 +653,7 @@ export default function IterationReview({ service, onServiceClosed }) {
       const updated = await servicesApi.updateIterationData(localService.service_name, iterationId, dataToSave);
       setLocalService(updated);
       setValidationErrors({});
+      setSaveAttempted(false);
       showToast('✅ Cambios guardados');
     } catch (e) {
       showToast(`❌ ${e.message}`);
@@ -844,10 +862,10 @@ export default function IterationReview({ service, onServiceClosed }) {
             )}
           </div>
           <div className="wide" style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingTop: '14px', borderTop: '1px solid var(--rule)' }}>
-            <ListEditor label="Entradas" items={localEdits.inputs || []} onChange={(v) => setLocalEdits((p) => ({ ...p, inputs: v }))} error={validationErrors.inputs} onBlur={() => setValidationErrors((prev) => ({ ...prev, inputs: null }))} />
-            <ListEditor label="Salidas" items={localEdits.outputs || []} onChange={(v) => setLocalEdits((p) => ({ ...p, outputs: v }))} error={validationErrors.outputs} onBlur={() => setValidationErrors((prev) => ({ ...prev, outputs: null }))} />
-            <ListEditor label="Invoca" items={localEdits.invokes || []} onChange={(v) => setLocalEdits((p) => ({ ...p, invokes: v }))} error={validationErrors.invokes} onBlur={() => setValidationErrors((prev) => ({ ...prev, invokes: null }))} />
-            <ListEditor label="Tablas referenciales" items={localEdits.reference_tables || []} onChange={(v) => setLocalEdits((p) => ({ ...p, reference_tables: v }))} error={validationErrors.reference_tables} onBlur={() => setValidationErrors((prev) => ({ ...prev, reference_tables: null }))} />
+            <ListEditor label="Entradas" items={localEdits.inputs || []} onChange={(v) => setLocalEdits((p) => ({ ...p, inputs: v }))} error={validationErrors.inputs} onBlur={() => setValidationErrors((prev) => ({ ...prev, inputs: null }))} submitted={saveAttempted} />
+            <ListEditor label="Salidas" items={localEdits.outputs || []} onChange={(v) => setLocalEdits((p) => ({ ...p, outputs: v }))} error={validationErrors.outputs} onBlur={() => setValidationErrors((prev) => ({ ...prev, outputs: null }))} submitted={saveAttempted} />
+            <ListEditor label="Invoca" items={localEdits.invokes || []} onChange={(v) => setLocalEdits((p) => ({ ...p, invokes: v }))} error={validationErrors.invokes} onBlur={() => setValidationErrors((prev) => ({ ...prev, invokes: null }))} submitted={saveAttempted} />
+            <ListEditor label="Tablas referenciales" items={localEdits.reference_tables || []} onChange={(v) => setLocalEdits((p) => ({ ...p, reference_tables: v }))} error={validationErrors.reference_tables} onBlur={() => setValidationErrors((prev) => ({ ...prev, reference_tables: null }))} submitted={saveAttempted} />
           </div>
         </div>
 
