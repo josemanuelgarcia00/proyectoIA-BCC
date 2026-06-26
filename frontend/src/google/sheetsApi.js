@@ -92,6 +92,16 @@ export async function getDriveFile(fileId) {
   return callAppsScriptPost({ action: 'getDriveFile', fileId });
 }
 
+/**
+ * Envía el HTML de un documento al Apps Script para que llame a Gemini.
+ * Devuelve el TSV crudo de servicios extraídos.
+ * La API key de Gemini vive en Script Properties (nunca en el frontend).
+ */
+export async function analyzeDocumentViaScript(htmlContent) {
+  const data = await callAppsScriptPost({ action: 'analyzeDocument', htmlContent });
+  return data.tsv;
+}
+
 /** Igual que gspread worksheet.get_all_records(): primera fila = cabecera. */
 export function recordsFromValues(values) {
   if (!values || values.length === 0) return [];
