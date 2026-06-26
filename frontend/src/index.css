@@ -256,10 +256,54 @@ header p {
   color: white;
 }
 
+.btn-filters-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: white;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.btn-filters-toggle:hover {
+  border-color: var(--primary);
+  color: var(--primary-dark);
+}
+
+.btn-filters-toggle.open {
+  border-color: var(--primary);
+  color: var(--primary-dark);
+  background: var(--primary-light);
+}
+
+.btn-filters-toggle.has-active {
+  border-color: var(--primary);
+}
+
+.filter-active-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex-shrink: 0;
+}
+
+.filters-toggle-arrow {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
 .panel-filters {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  margin-top: 6px;
 }
 
 /* --- PANEL DERECHO: watermark "S" siempre visible de fondo --- */

@@ -54,8 +54,9 @@ function CatalogView() {
   useEffect(() => { loadConflicts(); }, []);
 
   const [conflictFilter, setConflictFilter] = useState('all');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
-  useEffect(() => { setConflictFilter('all'); }, [view]);
+  useEffect(() => { setConflictFilter('all'); setFiltersOpen(false); }, [view]);
 
   const filteredServices = services
     .filter((service) => service.service_name.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -185,7 +186,7 @@ function CatalogView() {
                     </span>
                   </h2>
 
-                  <div style={{ marginBottom: '16px', display: 'flex', gap: '10px' }}>
+                  <div style={{ marginBottom: filtersOpen ? '8px' : '16px', display: 'flex', gap: '10px' }}>
                     <input
                       type="text"
                       className="search-input"
@@ -193,6 +194,17 @@ function CatalogView() {
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
+                    {view === 'conflicts' && (
+                      <button
+                        className={`btn-filters-toggle${filtersOpen ? ' open' : ''}${conflictFilter !== 'all' ? ' has-active' : ''}`}
+                        style={{ flex: 'none' }}
+                        onClick={() => setFiltersOpen(o => !o)}
+                      >
+                        Filtros
+                        {conflictFilter !== 'all' && <span className="filter-active-dot" />}
+                        <span className="filters-toggle-arrow">{filtersOpen ? '▲' : '▼'}</span>
+                      </button>
+                    )}
                     {view === 'dictionary' && (
                       <button
                         className="btn-quiet"
@@ -203,6 +215,26 @@ function CatalogView() {
                       </button>
                     )}
                   </div>
+
+                  {view === 'conflicts' && filtersOpen && (
+                    <div className="panel-filters" style={{ marginBottom: '16px' }}>
+                      {[
+                        { key: 'all',      label: 'Todos',          count: filteredServices.length },
+                        { key: 'new',      label: 'Nuevos',         count: filteredServices.filter(s => !s.is_in_dictionary).length },
+                        { key: 'conflict', label: 'Con conflictos', count: filteredServices.filter(s => s.requires_attention).length },
+                        { key: 'clean',    label: 'Sin conflictos', count: filteredServices.filter(s => !s.requires_attention && !s.closed).length },
+                      ].map(({ key, label, count }) => (
+                        <button
+                          key={key}
+                          className={`btn-filter${conflictFilter === key ? ' active' : ''}`}
+                          onClick={() => { setConflictFilter(key); setFiltersOpen(false); }}
+                        >
+                          {label}
+                          <span className="filter-count">{count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="service-list">
                     {displayedServices.length === 0 ? (
@@ -248,27 +280,6 @@ function CatalogView() {
               )}
             </div>
 
-            {view === 'conflicts' && !loading && services.length > 0 && (
-              <nav className="panel-nav">
-                <div className="panel-filters">
-                  {[
-                    { key: 'all',      label: 'Todos',          count: filteredServices.length },
-                    { key: 'new',      label: 'Nuevos',         count: filteredServices.filter(s => !s.is_in_dictionary).length },
-                    { key: 'conflict', label: 'Con conflictos', count: filteredServices.filter(s => s.requires_attention).length },
-                    { key: 'clean',    label: 'Sin conflictos', count: filteredServices.filter(s => !s.requires_attention && !s.closed).length },
-                  ].map(({ key, label, count }) => (
-                    <button
-                      key={key}
-                      className={`btn-filter${conflictFilter === key ? ' active' : ''}`}
-                      onClick={() => setConflictFilter(key)}
-                    >
-                      {label}
-                      <span className="filter-count">{count}</span>
-                    </button>
-                  ))}
-                </div>
-              </nav>
-            )}
           </div>
 
           <div className="panel panel-right">
