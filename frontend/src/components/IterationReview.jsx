@@ -253,7 +253,7 @@ const ALL_FIELDS = [
   { key: 'reference_tables', label: 'Tablas referenciales', inputType: 'list'     },
 ];
 
-function CompareTable({ iterationData, dictionaryData, conflicts, localEdits, setLocalEdits, validationErrors, setValidationErrors, hasPrevious }) {
+function CompareTable({ iterationData, dictionaryData, conflicts, localEdits, setLocalEdits, validationErrors, setValidationErrors, hasPrevious, saveAttempted }) {
   const conflictKeys = new Set((conflicts || []).map(c =>
     (c.column === 'document' || c.column === 'doc_version') ? 'source_document' : c.column
   ));
@@ -1000,6 +1000,7 @@ export default function IterationReview({ service, onServiceClosed }) {
               validationErrors={validationErrors}
               setValidationErrors={setValidationErrors}
               hasPrevious={isNewService && !!previousIteration}
+              saveAttempted={saveAttempted}
             />
 
             <div className="buttons" style={{ marginTop: '16px', justifyContent: 'space-between' }}>
