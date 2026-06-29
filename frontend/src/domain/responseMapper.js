@@ -10,10 +10,10 @@ export function toRowDTO(data) {
     verb: data.verb,
     scope: data.scope,
     functional_use: data.functional_use,
-    inputs: data.inputs,
-    outputs: data.outputs,
-    invokes: data.invokes,
-    reference_tables: data.reference_tables,
+    inputs: [...(data.inputs || [])],
+    outputs: [...(data.outputs || [])],
+    invokes: [...(data.invokes || [])],
+    reference_tables: [...(data.reference_tables || [])],
     source_document: data.source_document,
     doc_version: data.doc_version,
     reliability: data.reliability,
@@ -42,7 +42,7 @@ export function toResponseDTO(entity) {
     requires_attention: entity.perimeter_iterations.some((it) => it.conflicts.length > 0),
     closed: entity.closed,
     observations: entity.observations || '',
-    dictionary_data: toRowDTO(entity.winning_data),
+    dictionary_data: toRowDTO(entity.original_winning_data ?? entity.winning_data),
     perimeter_iterations: perimeterIterations,
   };
 }

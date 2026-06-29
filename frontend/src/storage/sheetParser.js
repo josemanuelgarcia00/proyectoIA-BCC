@@ -256,6 +256,7 @@ export function extractServicesFromRecords(dictionaryRecords, perimeterRecords) 
       name: serviceName,
       exists_in_dictionary: masterData ? 'Si' : 'No',
       consolidated_status: unchangedExisting ? 'Aceptado' : 'En revision',
+      original_winning_data: masterData,
       winning_data: masterData,
       perimeter_iterations: iterations,
       closed: unchangedExisting,

@@ -53,6 +53,7 @@ export function createServiceEntity(fields = {}) {
     name: '',
     exists_in_dictionary: 'No',
     consolidated_status: 'En revision',
+    original_winning_data: null,
     winning_data: null,
     dictionary_data: null,
     perimeter_iterations: [],
