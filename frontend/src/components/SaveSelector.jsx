@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-
-const API_BASE = import.meta.env.VITE_API_URL || '';
+import * as servicesApi from '../api/servicesApi';
 
 export default function SaveSelector({ services, loading, onSaved }) {
   const [selected, setSelected] = useState(new Set());
   const [saving, setSaving] = useState(false);
+  const [onlyReviewed, setOnlyReviewed] = useState(false);
 
   // Elegible = el usuario tomó una decisión explícita sobre él (aceptar y
   // cerrar, o rechazar) y ya no tiene conflictos. Un servicio NUEVO sin
@@ -33,21 +33,10 @@ export default function SaveSelector({ services, loading, onSaved }) {
 
   const handleSave = () => {
     setSaving(true);
-    fetch(`${API_BASE}/api/v1/services/save-to-excel`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ service_names: Array.from(selected) })
-    })
-      .then(async r => {
-        if (!r.ok) {
-          const err = await r.json().catch(() => ({}));
-          throw new Error(err.detail || `HTTP ${r.status}`);
-        }
-        return r.json();
-      })
+    servicesApi.saveToSheet(Array.from(selected))
       .then(data => {
         if (data.saved) {
-          onSaved(`✅ Guardado en Excel: ${data.services_written} servicio(s) al Diccionario, ${data.rejected_written} a Desechados (${data.perimeter_rows_archived} fila(s) archivadas del Perímetro)`);
+          onSaved(`✅ Guardado en Google Sheets: ${data.services_written} servicio(s) al Diccionario, ${data.rejected_written} a Desechados (${data.perimeter_rows_archived} fila(s) archivadas del Perímetro)`);
         } else {
           onSaved(`⚠️ ${data.pending_services} de los seleccionados todavía tienen conflictos sin revisar`);
         }
@@ -79,7 +68,7 @@ export default function SaveSelector({ services, loading, onSaved }) {
         queda pendiente para una próxima vez.
       </p>
 
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button className="btn-quiet" onClick={() => setSelected(new Set(eligible.map(s => s.service_name)))}>
           Seleccionar todos los listos
         </button>
@@ -87,8 +76,15 @@ export default function SaveSelector({ services, loading, onSaved }) {
           Deseleccionar todos
         </button>
         <button
-          className="btn-header"
-          style={{ marginLeft: 'auto', flex: 'none', color: 'var(--ink)', borderColor: 'var(--rule-strong)' }}
+          className="btn-quiet"
+          style={{ color: onlyReviewed ? 'var(--primary-dark)' : undefined, borderColor: onlyReviewed ? 'var(--primary-dark)' : undefined }}
+          onClick={() => setOnlyReviewed(v => !v)}
+        >
+          {onlyReviewed ? 'Ver todos' : 'Ver solo revisados'}
+        </button>
+        <button
+          className="btn-accept"
+          style={{ marginLeft: 'auto', flex: 'none' }}
           onClick={handleSave}
           disabled={saving || selected.size === 0}
         >
@@ -97,7 +93,7 @@ export default function SaveSelector({ services, loading, onSaved }) {
       </div>
 
       <div>
-        {services.map(s => {
+        {(onlyReviewed ? eligible : services).map(s => {
           const eligibleRow = isEligible(s);
           const reason = s.requires_attention
             ? ' · tiene conflictos pendientes'
