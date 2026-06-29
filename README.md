@@ -1,268 +1,139 @@
-# 🔧 Gestor de Conflictos - ProyectoIA
+# 🔧 Gestor de Conflictos de Servicios — Cajamar
 
-Sistema web de resolución de conflictos entre iteraciones de datos del perímetro. Permite seleccionar y aplicar cambios sobre la primera iteración en función de lo que venga en las siguientes.
+Aplicación web para **conciliar el catálogo de servicios** cuando llegan nuevas
+propuestas de datos. Cada vez que se revisa el perímetro de servicios pueden
+llegar varias versiones (iteraciones) de un mismo servicio con datos distintos.
+Esta herramienta ayuda a un revisor a decidir, servicio por servicio, **qué se
+queda en el catálogo maestro y qué se descarta**, sin perder información por el
+camino y dejando registro de cada decisión.
 
-## 🎯 Características
+Es un sitio **100% estático** (React + Vite, sin backend propio). Lee y escribe
+directamente sobre un **Google Sheet** a través de un pequeño **Google Apps
+Script**. No hay servidores que mantener ni credenciales en el frontend.
 
-- **Motor de Resolución de Conflictos**: Compara automáticamente iteraciones múltiples
-- **Interfaz Web Minimalista**: Diseño limpio con paleta de azules
-- **Lógica de Cascada**: Reglas inteligentes para resolver conflictos
-- **Selección Manual de Campos**: Elige el valor que desees para cada campo en conflicto
-- **Estados Visuales**: Códigos de color para fácil identificación
-- **API RESTful**: Endpoints para integración con otros sistemas
+## 🧩 Conceptos
 
-## 🚀 Inicio Rápido
+Para entender la aplicación basta con estos cuatro conceptos:
 
-### Requisitos
+- **Diccionario** — el catálogo maestro: la "verdad" actual de cada servicio
+  aceptado.
+- **Perímetro** — las propuestas a revisar. Un mismo servicio puede aparecer
+  varias veces como iteraciones sucesivas (sufijo `(1)`, `(2)`…), cada una con
+  posibles cambios respecto a la anterior.
+- **Conflicto** — una columna cuyo valor en una iteración difiere de su *línea
+  base* (la iteración anterior o, para la primera, el dato maestro del
+  Diccionario). Es lo que el revisor tiene que resolver.
+- **Resolución en cascada** — los conflictos se resuelven iteración a iteración
+  en orden. Cada iteración se compara con la **inmediatamente anterior ya
+  resuelta**, no con el original. Así los cambios se van acumulando de forma
+  controlada.
 
-- Python 3.8+
-- pip
+Cada conflicto se resuelve de una de dos formas:
 
-### Instalación
-
-1. **Clonar o descargar el proyecto**
-```bash
-cd ProyectoIA
-```
-
-2. **Instalar dependencias**
-```bash
-pip install -r requirements.txt
-```
-
-### Ejecución
-
-```bash
-python main.py
-```
-
-**Nota**: Si no existe `servicios.xlsx`, el sistema generará automáticamente un archivo de ejemplo con datos de prueba y conflictos detectados.
-
-La aplicación estará disponible en: `http://localhost:8000`
-
-## 📋 Estructura del Proyecto
-
-```
-ProyectoIA/
-├── main.py                          # Servidor FastAPI principal
-├── servicios.xlsx                   # Archivo Excel con datos (auto-generado)
-├── requirements.txt                 # Dependencias del proyecto
-├── app/
-│   ├── __init__.py
-│   ├── application/
-│   │   ├── serviceService.py        # Lógica de servicios
-│   │   └── conflictResolverService.py  # Motor de resolución de conflictos
-│   ├── domain/
-│   │   └── service.py               # Entidades de dominio
-│   └── infrastructure/
-│       ├── api/
-│       │   ├── dtos/
-│       │   │   └── serviceOutDTO.py      # DTOs de salida
-│       │   ├── templates/
-│       │   │   └── conflict_resolver.html # Interfaz web
-│       │   └── routers/
-│       │       └── controllers/
-│       │           └── serviceController.py  # Endpoints API
-│       ├── persistence/
-│       │   ├── dtos/
-│       │   │   └── servicePersistenceDTO.py  # DTOs de persistencia
-│       │   └── serviceRepository.py      # Acceso a datos (Lee Excel)
-│       └── storage/
-│           └── excelReader.py      # Lector de Excel y extractor de conflictos
-└── data/                           # Carpeta de datos
-```
-
-## 🔌 Endpoints API
-
-### Interfaz Web
-- **GET** `/api/v1/services/ui` - Abre la interfaz web de resolución
-
-### Servicios
-- **GET** `/api/v1/services/` - Obtener todos los servicios
-- **GET** `/api/v1/services/{id}` - Obtener servicio por ID
-
-### Salud
-- **GET** `/health` - Verificar estado del servidor
-
-## 🎨 Interfaz Web
-
-### Paleta de Colores
-
-| Color | Uso |
-|-------|-----|
-| Azul Primario (#0066cc) | Encabezados, botones principales |
-| Azul Claro (#e3f2fd) | Fondos de secciones |
-| Verde (#d4edda) | Estado Aceptado ✅ |
-| Púrpura (#e2d5f8) | Estado Unificado ⚖️ |
-| Naranja (#ffe5b4) | Estado En Revisión ⏳ |
-| Rojo (#f8d7da) | Conflictos/Rechazado ❌ |
-
-### Flujo de Uso
-
-1. **Buscar Servicio**: Ingresa el ID del servicio
-2. **Ver Iteraciones**: Se muestran todas las iteraciones disponibles
-3. **Detectar Conflictos**: Sistema identifica campos con valores diferentes
-4. **Seleccionar Valores**: Elige el valor deseado para cada campo
-5. **Aplicar Resolución**: Confirma los cambios
-
-## ⚙️ Lógica de Resolución
-
-### Caso 1: Una Iteración
-- Opción de **Aceptar** o **Rechazar**
-- Sin necesidad de resolver conflictos
-
-### Caso 2: Múltiples Iteraciones Idénticas
-- Se acepta automáticamente
-- Mensaje: "Todas las iteraciones tienen datos idénticos"
-
-### Caso 3: Múltiples Iteraciones con Conflictos
-- Se muestra interfaz de selección de campos
-- Usuario elige el valor preferido para cada campo
-- Se construye el registro final fusionando selecciones
-
-## 🔐 Modelos de Datos
-
-### ServiceEntity (Dominio)
-```python
-{
-  "name": str,                       # ID del servicio
-  "exists_in_dictionary": str,       # "Si" o "No"
-  "consolidated_status": str,        # Estado actual
-  "winning_data": ExcelRowData,      # Datos ganadores
-  "perimeter_iterations": [          # Iteraciones
-    {
-      "iteration_id": int,
-      "data": ExcelRowData,
-      "conflicts": [CellConflict]
-    }
-  ]
-}
-```
-
-### ExcelRowData
-```python
-{
-  "app": str,
-  "type": str,
-  "verb": str,
-  "scope": str,
-  "functional_use": str,
-  "inputs": [str],
-  "outputs": [str],
-  "invokes": [str],
-  "reference_tables": [str],
-  "source_document": str,
-  "doc_version": str,
-  "reliability": str
-}
-```
-
-## 📊 Estados de Servicios
-
-| Estado | Ícono | Significado |
-|--------|-------|-----------|
-| **Aceptado** | ✅ | Datos validados y listos |
-| **Rechazado** | ❌ | Datos descartados |
-| **Unificado** | ⚖️ | Datos unificados de múltiples fuentes |
-| **En Revisión** | ⏳ | Esperando resolución manual |
-
-## 🐛 Solución de Problemas
-
-### Error: "Servicio no encontrado"
-- Verifica que el ID del servicio sea correcto (usa el nombre de la columna "Nombre" en Perímetro)
-- Asegúrate de que `servicios.xlsx` existe en la raíz del proyecto
-
-### Error: "Archivo Excel no encontrado"
-- Verifica la ruta configurada en `EXCEL_PATH` (o `DATA_SOURCE=google_sheets`)
-
-### El Excel no se lee correctamente
-- Verifica que el Excel tenga las hojas: "Diccionario" y "Perímetro"
-- Los nombres de columnas deben estar en la primera fila
-
-### Puerto 8000 en uso
-- Cambia el puerto en `main.py`:
-```python
-uvicorn.run("main:app", host="127.0.0.1", port=8001)
-```
-
-## 📝 Requisitos (requirements.txt)
-
-```
-fastapi
-uvicorn
-pydantic
-pandas
-openpyxl
-gspread
-google-auth
-```
-
-**Nota**: No se usa MongoDB. Los datos se leen desde Excel local o Google Sheets, según la variable de entorno `DATA_SOURCE`.
-
-## 🔄 Flujo de Datos
-
-```
-Excel (servicios.xlsx)
-  ↓
-ExcelReader (extrae y mapea datos)
-  ↓
-FastAPI Controller
-  ↓
-ServiceService (Aplicación)
-  ↓
-ConflictResolver (Motor de detección)
-  ↓
-ServiceResponseDTO (Serialización)
-  ↓
-Frontend Web (Visualización)
-```
-
-## 🎓 Ejemplo de Uso API
-
-### Obtener Servicio
-```bash
-curl http://localhost:8000/api/v1/services/ACTIVOS
-```
-
-### Respuesta
-```json
-{
-  "service_name": "ACTIVOS",
-  "status": "En revision",
-  "is_in_dictionary": true,
-  "requires_attention": true,
-  "perimeter_iterations": [
-    {
-      "iteration_id": 1,
-      "data": {
-        "app": "APP1",
-        "type": "Recurso",
-        "verb": "GET",
-        ...
-      },
-      "conflicts": []
-    }
-  ]
-}
-```
-
-## 🤝 Contribuciones
-
-Las contribuciones son bienvenidas. Por favor:
-1. Fork el proyecto
-2. Crea una rama para tu feature
-3. Commit tus cambios
-4. Push a la rama
-5. Abre un Pull Request
-
-## 📄 Licencia
-
-Proyecto interno - ProyectoIA © 2025
-
-## 👥 Autor
-
-Desarrollado como solución de resolución de conflictos para gestión de servicios.
+| Acción | Qué hace |
+|--------|----------|
+| **Unificar** | Combina el valor base y el nuevo (los une, sin duplicar). No se pierde nada. |
+| **Rechazar cambios** | Descarta el valor nuevo de esa iteración y mantiene la línea base. |
 
 ---
 
-**¿Preguntas?** Consulta la documentación de la API en `http://localhost:8000/docs`
+## Flujo de trabajo
+
+El revisor trabaja desde cuatro vistas (los botones de la cabecera):
+
+### 1. Pendientes de revisión
+Punto de partida. Lista los servicios que requieren atención: tienen conflictos
+sin resolver, son servicios **nuevos** (aún no están en el Diccionario), o ya se
+resolvieron pero todavía no se han confirmado.
+
+Al seleccionar un servicio se ven todas sus iteraciones y, en cada una, los
+conflictos. El revisor:
+
+1. Resuelve cada iteración (**Unificar** o **Rechazar cambios**), en cascada.
+2. Puede añadir **observaciones** al servicio o a una iteración concreta.
+3. Cuando ya no quedan conflictos, decide el cierre del servicio:
+   - **Aceptar y cerrar** → une el resultado final con el dato maestro y lo fija
+     como definitivo para el Diccionario.
+   - **Rechazar servicio** → si es nuevo queda **Desechado**; si ya existía en
+     el Diccionario, se mantiene el dato maestro vigente.
+4. Si se equivoca, puede **revertir** una iteración, **reiniciar** todo el
+   servicio a su estado original, o deshacer un rechazo.
+
+> Mientras un servicio no se "cierra" sigue visible en Pendientes aunque ya no
+> tenga conflictos, para que ninguna revisión a medias se pierda de vista.
+
+### 2. Diccionario completo
+Consulta de **todo** el catálogo maestro, incluyendo servicios sin actividad en
+el perímetro actual. Con búsqueda por nombre y orden alfabético. Es solo
+lectura.
+
+### 3. Desechados
+Servicios marcados como rechazados en la sesión. Desde aquí se puede **devolver
+un servicio a revisión** si se descartó por error.
+
+### 4. Guardar en Google Sheets
+Vista final. Permite elegir qué servicios volcar (o todos). Al guardar, los
+servicios ya resueltos se escriben de forma definitiva:
+
+- El resultado final se vuelca a **Diccionario** (aceptados) o **Desechados**
+  (rechazados).
+- Las filas correspondientes del **Perímetro** se archivan en
+  **Perímetro_Historico** con fecha.
+- Se limpia su rastro del registro de auditoría.
+
+Solo se guardan servicios sin conflictos pendientes; si quedan, avisa y no
+escribe.
+
+---
+
+## Estado y auditoría
+
+Cada decisión (resolver, revertir, aceptar, rechazar, observaciones…) se anota
+en la hoja **Auditoria** como un snapshot completo del servicio. Esto tiene un
+efecto clave: **al recargar la página, la aplicación reproduce ese registro y
+restaura el estado de la revisión en curso**. Se puede cerrar el navegador a
+mitad de un trabajo sin perder lo avanzado, aunque todavía no se haya pulsado
+"Guardar en Google Sheets".
+
+El "guardar" definitivo es lo único que modifica el Diccionario maestro; hasta
+entonces todo el trabajo vive en memoria + el log de auditoría.
+
+---
+
+## Hojas del Google Sheet
+
+| Hoja | Uso |
+|------|-----|
+| `Diccionario` | Catálogo maestro de servicios aceptados |
+| `Perímetro` | Propuestas/iteraciones a revisar (sufijo `(n)` para iteraciones sucesivas) |
+| `Desechados` | Servicios rechazados |
+| `Perímetro_Historico` | Filas de Perímetro ya procesadas, archivadas con fecha |
+| `Auditoria` | Historial de decisiones; permite restaurar la revisión al recargar |
+
+---
+
+## Puesta en marcha (Local)
+
+### 1. Publicar el Google Apps Script
+1. En [script.google.com](https://script.google.com/) → **Nuevo proyecto**.
+2. Pega el contenido de [`apps-script/Code.gs`](apps-script/Code.gs).
+3. Pon `SHEET_ID` (arriba del archivo) con el ID de tu Sheet (de la URL
+   `.../d/<ID>/edit`).
+4. **Implementar → Nueva implementación** → tipo **"Aplicación web"**:
+   - Ejecutar como: **Yo**
+   - Quién tiene acceso: **Cualquier usuario, incluso anónimos** (crítico para CORS)
+5. Autoriza los permisos y copia la URL que termina en `/exec`.
+
+> Cada cambio en `Code.gs` requiere **Gestionar implementaciones → Nueva
+> versión** (o una implementación nueva) para que la URL publicada lo use.
+
+### 2. Arrancar el frontend
+```bash
+cd frontend
+cp .env.example .env
+# Edita .env: VITE_GOOGLE_SHEET_ID (ID del Sheet) y VITE_APPS_SCRIPT_URL (la URL /exec)
+npm install
+npm run dev
+```
+Disponible en `http://localhost:5173/proyectoIA-BCC/` (ajusta `base` en
+`vite.config.js` si el repo se llama distinto).
