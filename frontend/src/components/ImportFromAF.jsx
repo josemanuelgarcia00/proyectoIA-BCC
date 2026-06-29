@@ -109,7 +109,6 @@ export default function ImportFromAF({ onDone }) {
 
   const countNew        = services.filter(s => s.data.scope === 'Nuevo').length;
   const countExisting   = services.length - countNew;
-  const pickerConfigured = !!(import.meta.env.VITE_GOOGLE_CLIENT_ID && import.meta.env.VITE_GOOGLE_API_KEY);
 
   // ── Panel izquierdo ────────────────────────────────────────────────────────
   function renderLeft() {
@@ -183,31 +182,6 @@ export default function ImportFromAF({ onDone }) {
           </div>
         ))}
 
-        {!pickerConfigured && source === 'drive' && (
-          <div style={{ marginTop: '8px', borderTop: '1px solid var(--rule)', paddingTop: '18px' }}>
-            <span className="data-field-label" style={{ color: 'var(--amber-ink)', marginBottom: '12px', display: 'block' }}>
-              Setup del picker de Drive
-            </span>
-            {[
-              { n: 1, text: 'Ve a console.cloud.google.com y selecciona (o crea) el mismo proyecto de Google Cloud que usa tu Apps Script.' },
-              { n: 2, text: 'APIs y servicios → Habilitar APIs → busca y activa "Google Picker API" y "Google Drive API".' },
-              { n: 3, text: 'Credenciales → Crear credencial → Clave de API. Copia el valor (VITE_GOOGLE_API_KEY).' },
-              { n: 4, text: 'Credenciales → Crear credencial → ID de cliente OAuth 2.0. Tipo: Aplicación web. En "Orígenes de JavaScript autorizados" añade http://localhost:5173. Copia el ID (VITE_GOOGLE_CLIENT_ID).' },
-              { n: 5, text: <>Añade las dos claves al archivo <code style={{ fontFamily: 'var(--font-mono)', background: 'var(--paper)', padding: '1px 4px' }}>frontend/.env</code> y reinicia el servidor de desarrollo.</> },
-            ].map(({ n, text }) => (
-              <div key={n} style={{ display: 'flex', gap: '10px', marginBottom: '12px', alignItems: 'flex-start' }}>
-                <span style={{
-                  fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700,
-                  color: 'var(--amber-ink)', background: 'var(--amber-light)',
-                  borderRadius: '2px', padding: '2px 7px', flex: 'none', lineHeight: 1.6,
-                }}>
-                  {n}
-                </span>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.65' }}>{text}</span>
-              </div>
-            ))}
-          </div>
-        )}
       </>
     );
   }
@@ -382,32 +356,16 @@ export default function ImportFromAF({ onDone }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
             {/* Picker — opción principal */}
-            {pickerConfigured ? (
-              <div className="data-card accent-primary" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.6', margin: 0 }}>
-                  Se abrirá el selector de archivos de Google Drive. Inicia sesión con tu cuenta de Google si se solicita.
-                </p>
-                <div>
-                  <button className="btn-accept" onClick={handleOpenPicker}>
-                    Abrir Google Drive
-                  </button>
-                </div>
+            <div className="data-card accent-primary" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.6', margin: 0 }}>
+                Se abrirá el selector de archivos de Google Drive. Inicia sesión con tu cuenta de Google si se solicita.
+              </p>
+              <div>
+                <button className="btn-accept" onClick={handleOpenPicker}>
+                  Abrir Google Drive
+                </button>
               </div>
-            ) : (
-              <div className="data-card" style={{ borderLeft: '3px solid var(--amber-ink)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <span className="data-field-label" style={{ color: 'var(--amber-ink)' }}>Configuración pendiente</span>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.7', margin: 0 }}>
-                  Para abrir Drive directamente necesitas añadir dos claves al archivo <code style={{ fontFamily: 'var(--font-mono)', background: 'var(--paper)', padding: '1px 5px', borderRadius: '2px' }}>frontend/.env</code>:
-                </p>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', background: 'var(--paper)', padding: '10px 14px', borderRadius: '2px', lineHeight: '1.9', color: 'var(--ink)' }}>
-                  VITE_GOOGLE_CLIENT_ID=<span style={{ color: 'var(--text-muted)' }}>xxx.apps.googleusercontent.com</span><br />
-                  VITE_GOOGLE_API_KEY=<span style={{ color: 'var(--text-muted)' }}>AIza...</span>
-                </div>
-                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: '1.6' }}>
-                  Consulta las instrucciones en el panel izquierdo para obtenerlas desde Google Cloud Console. Mientras tanto puedes usar la opción «pega el enlace» que está más abajo.
-                </p>
-              </div>
-            )}
+            </div>
 
             {/* Separador */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
