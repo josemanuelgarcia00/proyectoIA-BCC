@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import * as servicesApi from '../api/servicesApi';
-
-const renderList = (list) => (!list || list.length === 0 ? 'N/D' : list.join(', '));
+import Toast from './ui/Toast';
+import ListFieldsDisplay from './service/ListFieldsDisplay';
+import useToast from '../hooks/useToast';
 
 export default function RejectedEntry({ service, onRestored }) {
   const [localService, setLocalService] = useState(service);
   const [expandedId, setExpandedId] = useState(null);
   const [savingId, setSavingId] = useState(null);
-  const [toast, setToast] = useState(null);
+  const { toast, showToast } = useToast();
 
   useEffect(() => {
     setLocalService(service);
@@ -17,11 +18,6 @@ export default function RejectedEntry({ service, onRestored }) {
   if (!localService) {
     return <div className="empty">Selecciona un servicio para ver sus datos.</div>;
   }
-
-  const showToast = (text) => {
-    setToast(text);
-    setTimeout(() => setToast(null), 4000);
-  };
 
   const isWholeServiceRejected = localService.status === 'Desechado';
   const rejectedIterations = isWholeServiceRejected
@@ -76,53 +72,31 @@ export default function RejectedEntry({ service, onRestored }) {
           {rejectedIterations.map((it) => {
             const isExpanded = expandedId === it.iteration_id;
             return (
-              <div
-                key={it.iteration_id}
-                style={{ background: 'white', border: '1px solid var(--rule)', borderRadius: '3px', marginBottom: '10px' }}
-              >
-                {/* Cabecera */}
+              <div key={it.iteration_id} style={{ background: 'white', border: '1px solid var(--rule)', borderRadius: '3px', marginBottom: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: isExpanded ? '1px solid var(--rule)' : 'none' }}>
                   <div
                     onClick={() => setExpandedId(isExpanded ? null : it.iteration_id)}
                     style={{ display: 'flex', flexDirection: 'column', gap: '4px', cursor: 'pointer', flex: 1 }}
                   >
                     <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span className="mono" style={{ fontWeight: 600, fontSize: '13px' }}>
-                        Iteración {it.iteration_id}
-                      </span>
+                      <span className="mono" style={{ fontWeight: 600, fontSize: '13px' }}>Iteración {it.iteration_id}</span>
                       <span className="stamp stamp-rust">Rechazada</span>
                       <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                         {isExpanded ? '▲ Ocultar' : '▼ Ver detalles'}
                       </span>
                     </span>
                     {it.observations && (
-                      <div style={{
-                        marginTop: '6px',
-                        padding: '7px 10px',
-                        background: 'var(--rust-faint, #fdf2f0)',
-                        borderLeft: '3px solid var(--rust)',
-                        borderRadius: '2px',
-                        fontSize: '12.5px',
-                        color: 'var(--ink)',
-                      }}>
-                        <span style={{ fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--rust)', marginRight: '6px' }}>
-                          Motivo:
-                        </span>
+                      <div style={{ marginTop: '6px', padding: '7px 10px', background: 'var(--rust-faint, #fdf2f0)', borderLeft: '3px solid var(--rust)', borderRadius: '2px', fontSize: '12.5px', color: 'var(--ink)' }}>
+                        <span style={{ fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--rust)', marginRight: '6px' }}>Motivo:</span>
                         {it.observations}
                       </div>
                     )}
                   </div>
-                  <button
-                    className="btn-quiet"
-                    disabled={savingId === it.iteration_id}
-                    onClick={() => restoreIteration(it.iteration_id)}
-                    style={{ flexShrink: 0, marginLeft: '16px' }}
-                  >
+                  <button className="btn-quiet" disabled={savingId === it.iteration_id} onClick={() => restoreIteration(it.iteration_id)} style={{ flexShrink: 0, marginLeft: '16px' }}>
                     {savingId === it.iteration_id ? 'Aplicando...' : 'Restaurar a revisión'}
                   </button>
                 </div>
 
-                {/* Detalle expandido (solo lectura) */}
                 {isExpanded && (
                   <div style={{ padding: '16px' }}>
                     <div className="data-grid" style={{ marginBottom: '16px' }}>
@@ -136,12 +110,8 @@ export default function RejectedEntry({ service, onRestored }) {
                         <span className="data-field-label">Uso funcional</span>
                         {it.data.functional_use || 'N/D'}
                       </div>
-                      <div className="wide"><span className="data-field-label">Entradas</span><span className="mono">{renderList(it.data.inputs)}</span></div>
-                      <div className="wide"><span className="data-field-label">Salidas</span><span className="mono">{renderList(it.data.outputs)}</span></div>
-                      <div className="wide"><span className="data-field-label">Invoca</span><span className="mono">{renderList(it.data.invokes)}</span></div>
-                      <div className="wide"><span className="data-field-label">Tablas referenciales</span><span className="mono">{renderList(it.data.reference_tables)}</span></div>
+                      <ListFieldsDisplay data={it.data} />
                     </div>
-
                   </div>
                 )}
               </div>
@@ -150,17 +120,7 @@ export default function RejectedEntry({ service, onRestored }) {
         </div>
       )}
 
-      {toast && (
-        <div style={{
-          position: 'fixed', bottom: '24px', right: '24px',
-          background: toast.startsWith('❌') ? 'var(--rust)' : 'var(--ink)',
-          color: 'white', padding: '13px 18px', borderRadius: '2px',
-          boxShadow: '0 6px 20px rgba(0,0,0,0.18)', fontWeight: 500,
-          fontSize: '13.5px', zIndex: 1000,
-        }}>
-          {toast}
-        </div>
-      )}
+      <Toast message={toast} />
     </div>
   );
 }

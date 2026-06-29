@@ -1,19 +1,15 @@
 import React from 'react';
+import DataCard from './ui/DataCard';
+import ListFieldsDisplay from './service/ListFieldsDisplay';
+import ServiceHeader from './service/ServiceHeader';
 
 const STATUS_STAMP = {
   'Aceptado': 'stamp-moss',
   'Unificado': 'stamp-moss',
   'Cerrado': 'stamp-moss',
   'Desechado': 'stamp-rust',
-  'En revision': 'stamp-amber'
+  'En revision': 'stamp-amber',
 };
-
-const LIST_FIELDS = [
-  { key: 'inputs',           label: 'Entradas' },
-  { key: 'outputs',          label: 'Salidas' },
-  { key: 'invokes',          label: 'Invoca' },
-  { key: 'reference_tables', label: 'Tablas referenciales' },
-];
 
 export default function DictionaryEntry({ service }) {
   if (!service) {
@@ -25,10 +21,12 @@ export default function DictionaryEntry({ service }) {
 
   return (
     <div className="iteration-review">
-      <h2 style={{ marginBottom: '16px', color: 'var(--ink)', fontSize: '17px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <span className="mono">{service.service_name}</span>
-        <span className={`stamp ${stampClass}`}>{service.status}</span>
-      </h2>
+      <ServiceHeader
+        name={service.service_name}
+        status={service.status}
+        statusClass={stampClass}
+        style={{ marginBottom: '16px' }}
+      />
 
       {service.observations && (
         <div className="info-line" style={{ background: 'var(--paper)', borderLeftColor: 'var(--rule-strong)', marginBottom: '20px' }}>
@@ -46,9 +44,7 @@ export default function DictionaryEntry({ service }) {
           No hay datos del Diccionario para este servicio.
         </div>
       ) : (
-        <div className="data-card accent-primary">
-          <h3>Diccionario maestro</h3>
-
+        <DataCard title="Diccionario maestro" accent="primary">
           <div className="data-grid">
             <div><span className="data-field-label">App</span><span className="mono">{data.app || 'N/D'}</span></div>
             <div><span className="data-field-label">Tipo</span><span className="mono">{data.type || 'N/D'}</span></div>
@@ -56,26 +52,13 @@ export default function DictionaryEntry({ service }) {
             <div><span className="data-field-label">Ámbito</span>{data.scope || 'N/D'}</div>
             <div><span className="data-field-label">Fiabilidad</span>{data.reliability || 'N/D'}</div>
             <div className="wide"><span className="data-field-label">Documento</span>{data.source_document || 'N/D'} <span className="mono">v{data.doc_version || '-'}</span></div>
-
             <div className="data-field-block">
               <span className="data-field-label">Uso funcional</span>
               {data.functional_use || 'N/D'}
             </div>
-
-            <div className="list-fields-block">
-              {LIST_FIELDS.map(({ key, label }) => (
-                <div key={key} className="list-field">
-                  <span className="data-field-label">{label}</span>
-                  <div className="list-pills">
-                    {data[key]?.length > 0
-                      ? data[key].map((v, i) => <span key={i} className="data-pill">{v}</span>)
-                      : <span className="pill-empty">N/D</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <ListFieldsDisplay data={data} />
           </div>
-        </div>
+        </DataCard>
       )}
     </div>
   );
