@@ -33,24 +33,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check env vars
-        run: |
-          [ -n "$VITE_GOOGLE_CLIENT_ID" ] && echo "VITE_GOOGLE_CLIENT_ID: SET" || echo "VITE_GOOGLE_CLIENT_ID: MISSING"
-          [ -n "$VITE_GOOGLE_API_KEY" ] && echo "VITE_GOOGLE_API_KEY: SET" || echo "VITE_GOOGLE_API_KEY: MISSING"
-          [ -n "$VITE_GEMINI_API_KEY" ] && echo "VITE_GEMINI_API_KEY: SET" || echo "VITE_GEMINI_API_KEY: MISSING"
-        env:
-          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
-          VITE_GOOGLE_API_KEY: ${{ secrets.VITE_GOOGLE_API_KEY }}
-          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
-
       - name: Build
         run: npm run build
         env:
           VITE_GOOGLE_SHEET_ID: ${{ vars.VITE_GOOGLE_SHEET_ID }}
           VITE_APPS_SCRIPT_URL: ${{ vars.VITE_APPS_SCRIPT_URL }}
-          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
-          VITE_GOOGLE_API_KEY: ${{ secrets.VITE_GOOGLE_API_KEY }}
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          VITE_GOOGLE_API_KEY: ${{ vars.VITE_GOOGLE_API_KEY }}
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
