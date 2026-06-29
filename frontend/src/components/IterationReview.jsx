@@ -748,7 +748,7 @@ export default function IterationReview({ service, onServiceClosed }) {
         <div><span className="data-field-label">Verbo</span><span className="mono">{localService.dictionary_data?.verb || 'N/D'}</span></div>
         <div><span className="data-field-label">Ámbito</span>{localService.dictionary_data?.scope || 'N/D'}</div>
         <div><span className="data-field-label">Fiabilidad</span>{localService.dictionary_data?.reliability || 'N/D'}</div>
-        <div><span className="data-field-label">Documento</span>{localService.dictionary_data?.source_document || 'N/D'} <span className="mono">v{localService.dictionary_data?.doc_version || '-'}</span></div>
+        <div className="wide"><span className="data-field-label">Documento</span>{localService.dictionary_data?.source_document || 'N/D'} <span className="mono">v{localService.dictionary_data?.doc_version || '-'}</span></div>
 
         <div className="data-field-block">
           <span className="data-field-label">Uso funcional</span>
@@ -773,7 +773,7 @@ export default function IterationReview({ service, onServiceClosed }) {
         <div><span className="data-field-label">Verbo</span><span className="mono">{finalData?.verb || 'N/D'}</span></div>
         <div><span className="data-field-label">Ámbito</span>{finalData?.scope || 'N/D'}</div>
         <div><span className="data-field-label">Fiabilidad</span>{finalData?.reliability || 'N/D'}</div>
-        <div><span className="data-field-label">Documento</span>{finalData?.source_document || 'N/D'} <span className="mono">v{finalData?.doc_version || '-'}</span></div>
+        <div className="wide"><span className="data-field-label">Documento</span>{finalData?.source_document || 'N/D'} <span className="mono">v{finalData?.doc_version || '-'}</span></div>
 
         <div className="data-field-block">
           <span className="data-field-label">Uso funcional</span>
@@ -833,7 +833,7 @@ export default function IterationReview({ service, onServiceClosed }) {
           <div><label className="data-field-label">Verbo</label>{inp('verb', FIELD_ENUM_OPTIONS.verb)}</div>
           <div><label className="data-field-label">Ámbito</label>{inp('scope')}</div>
           <div><span className="data-field-label">Fiabilidad</span>{finalData?.reliability || 'N/D'}</div>
-          <div><span className="data-field-label">Documento</span>{finalData?.source_document || 'N/D'} <span className="mono">v{finalData?.doc_version || '-'}</span></div>
+          <div className="wide"><span className="data-field-label">Documento</span>{finalData?.source_document || 'N/D'} <span className="mono">v{finalData?.doc_version || '-'}</span></div>
 
           <div className="wide data-field-block">
             <label className="data-field-label">Uso funcional</label>
@@ -908,7 +908,7 @@ export default function IterationReview({ service, onServiceClosed }) {
         <div><span className="data-field-label">Verbo</span><span className="mono">{previousIteration.data?.verb || 'N/D'}</span></div>
         <div><span className="data-field-label">Ámbito</span>{previousIteration.data?.scope || 'N/D'}</div>
         <div><span className="data-field-label">Fiabilidad</span>{previousIteration.data?.reliability || 'N/D'}</div>
-        <div><span className="data-field-label">Documento</span>{previousIteration.data?.source_document || 'N/D'} <span className="mono">v{previousIteration.data?.doc_version || '-'}</span></div>
+        <div className="wide"><span className="data-field-label">Documento</span>{previousIteration.data?.source_document || 'N/D'} <span className="mono">v{previousIteration.data?.doc_version || '-'}</span></div>
         <div className="data-field-block">
           <span className="data-field-label">Uso funcional</span>
           {previousIteration.data?.functional_use || 'N/D'}
@@ -1075,8 +1075,8 @@ export default function IterationReview({ service, onServiceClosed }) {
           justifyContent: 'center', zIndex: 2000, padding: '20px'
         }}>
           <div style={{
-            background: 'white', borderRadius: '4px', padding: '24px',
-            maxWidth: '640px', width: '100%', maxHeight: '85vh', overflowY: 'auto',
+          background: 'white', borderRadius: '4px', padding: '32px',
+            maxWidth: '900px', width: '100%', maxHeight: '85vh', overflowY: 'auto',
             border: '1px solid var(--rule)'
           }}>
             <h3 style={{ color: 'var(--ink)', marginBottom: '6px', fontSize: '15px', fontWeight: 600 }}>
@@ -1092,7 +1092,7 @@ export default function IterationReview({ service, onServiceClosed }) {
               <div><span className="data-field-label">Verbo</span><span className="mono">{previewData.verb || 'N/D'}</span></div>
               <div><span className="data-field-label">Ámbito</span>{previewData.scope || 'N/D'}</div>
               <div><span className="data-field-label">Fiabilidad</span>{previewData.reliability || 'N/D'}</div>
-              <div><span className="data-field-label">Documento</span>{previewData.source_document || 'N/D'} <span className="mono">v{previewData.doc_version || '-'}</span></div>
+              <div className="wide"><span className="data-field-label">Documento</span>{previewData.source_document || 'N/D'} <span className="mono">v{previewData.doc_version || '-'}</span></div>
 
               <div className="data-field-block">
                 <span className="data-field-label">Uso funcional</span>
