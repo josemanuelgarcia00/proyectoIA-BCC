@@ -33,6 +33,7 @@ export default function CompareTable({
   validationErrors,
   setValidationErrors,
   hasPrevious,
+  allFieldsEditable,
   saveAttempted,
 }) {
   const conflictKeys = new Set((conflicts || []).map(c =>
@@ -128,7 +129,7 @@ export default function CompareTable({
         const isWide = inputType === 'textarea' || inputType === 'list';
         const rowClass = `compare-row compare-row--${isDiff ? 'diff' : 'equal'}${isWide ? ' compare-row--wide' : ''}`;
         const leftCell = hasLeftCol ? renderDisplayValue(key, dictionaryData, inputType) : null;
-        const isEditable = !isReadonly && (isDiff || hasPrevious);
+        const isEditable = !isReadonly && (isDiff || allFieldsEditable);
         const rightCell = isEditable
           ? renderEditControl(key, inputType)
           : renderDisplayValue(key, iterationData, inputType);

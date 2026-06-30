@@ -367,6 +367,12 @@ export default function IterationReview({ service, onServiceClosed }) {
                   validationErrors={validationErrors}
                   setValidationErrors={setValidationErrors}
                   hasPrevious={isNewService && !!previousIteration}
+                  allFieldsEditable={
+                    isNewService &&
+                    !!previousIteration &&
+                    previousIteration.resolution === null &&
+                    previousIteration.conflicts.length === 0
+                  }
                   saveAttempted={saveAttempted}
                 />
 
