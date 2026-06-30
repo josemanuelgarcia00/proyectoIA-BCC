@@ -128,7 +128,8 @@ export default function CompareTable({
         const isWide = inputType === 'textarea' || inputType === 'list';
         const rowClass = `compare-row compare-row--${isDiff ? 'diff' : 'equal'}${isWide ? ' compare-row--wide' : ''}`;
         const leftCell = hasLeftCol ? renderDisplayValue(key, dictionaryData, inputType) : null;
-        const rightCell = (isDiff && !isReadonly)
+        const isEditable = !isReadonly && (isDiff || hasPrevious);
+        const rightCell = isEditable
           ? renderEditControl(key, inputType)
           : renderDisplayValue(key, iterationData, inputType);
 
