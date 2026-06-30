@@ -21,10 +21,12 @@ function buildConflicts(baselineData, currentData) {
 
   for (const attrName of FIELDS_TO_CHECK) {
     if (hasNewContent(currentData[attrName], baselineData[attrName], attrName)) {
+      const bv = baselineData[attrName];
+      const cv = currentData[attrName];
       conflicts.push(createCellConflict({
         column: attrName,
-        dictionary_base_value: String(baselineData[attrName]),
-        perimeter_new_proposal: String(currentData[attrName]),
+        dictionary_base_value: Array.isArray(bv) ? bv.join(';') : String(bv ?? ''),
+        perimeter_new_proposal: Array.isArray(cv) ? cv.join(';') : String(cv ?? ''),
       }));
     }
   }

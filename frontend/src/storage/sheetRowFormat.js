@@ -18,6 +18,10 @@ export function formatDocumentVersion(sourceDocument, docVersion) {
   return `${sourceDocument} | ${versionLabel}`;
 }
 
+function serializeListField(items) {
+  return (items || []).map((item) => (typeof item === 'object' && item !== null ? item.name : item)).join(';');
+}
+
 export function rowFromData(serviceName, data) {
   return {
     servicio: serviceName,
@@ -26,10 +30,10 @@ export function rowFromData(serviceName, data) {
     verbo: data.verb,
     ambito: data.scope,
     uso_funcional: data.functional_use,
-    entradas: (data.inputs || []).join(';'),
-    salidas: (data.outputs || []).join(';'),
-    invoca: (data.invokes || []).join(';'),
-    tablas_referenciales: (data.reference_tables || []).join(';'),
+    entradas: serializeListField(data.inputs),
+    salidas: serializeListField(data.outputs),
+    invoca: serializeListField(data.invokes),
+    tablas_referenciales: serializeListField(data.reference_tables),
     'documento_origen | version': formatDocumentVersion(data.source_document, data.doc_version),
     fiabilidad: data.reliability,
   };

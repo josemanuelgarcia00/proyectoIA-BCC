@@ -163,8 +163,8 @@ function detectConflicts(currentData, baselineData) {
     if (hasNewContent(currentValue, baseValue, attrName)) {
       conflicts.push(createCellConflict({
         column: attrName,
-        dictionary_base_value: String(baseValue),
-        perimeter_new_proposal: String(currentValue),
+        dictionary_base_value: Array.isArray(baseValue) ? baseValue.join(';') : String(baseValue ?? ''),
+        perimeter_new_proposal: Array.isArray(currentValue) ? currentValue.join(';') : String(currentValue ?? ''),
       }));
     }
   }

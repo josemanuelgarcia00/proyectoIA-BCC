@@ -60,9 +60,8 @@ export async function saveDictionary(sheetId, services) {
     if (service.perimeter_iterations.some((it) => it.conflicts.length > 0)) continue;
     if (!service.closed) continue;
 
-    const finalData = service.closed && service.winning_data
-      ? service.winning_data
-      : service.perimeter_iterations[service.perimeter_iterations.length - 1].data;
+    const finalData = service.winning_data
+      ?? service.perimeter_iterations[service.perimeter_iterations.length - 1].data;
     rowsByService[service.name] = rowFromData(service.name, finalData);
     upserted += 1;
   }
